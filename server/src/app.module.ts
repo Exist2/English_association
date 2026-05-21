@@ -12,7 +12,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { appConfig, databaseConfig } from './config';
+import { CustomThrottlerGuard, JwtAuthGuard } from './common/guards';
+import { RedisModule } from './common/redis';
 import { AuthModule } from './modules/auth/auth.module';
 import { DocumentModule } from './modules/document/document.module';
 import { AssociationModule } from './modules/association/association.module';
@@ -67,6 +70,12 @@ import { SettingsModule } from './modules/settings/settings.module';
       },
     ]),
 
+    /**
+     * RedisModule 提供全局 Redis 客户端
+     * 用于验证码存储、登录尝试记录等需要自动过期的临时数据
+     */
+    RedisModule,
+
     // 业务模块
     AuthModule,
     DocumentModule,
@@ -75,6 +84,25 @@ import { SettingsModule } from './modules/settings/settings.module';
     SettingsModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    /**
+     * 全局注册自定义频率限制守卫
+     * APP_GUARD 是 NestJS 提供的特殊 token，用于注册全局守卫
+     * 这样所有路由都会自动受到频率限制保护，无需在每个控制器上单独添加
+     */
+    {
+      provide: APP_GUARD,
+      useClass: CustomThrottlerGuard,
+    },
+    /**
+     * 全局注册 JWT 认证守卫
+     * 所有路由默认需要 JWT 认证，使用 @Public() 装饰器标记的路由除外
+     * 执行顺序：ThrottlerGuard → JwtAuthGuard → 控制器方法
+     */
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
