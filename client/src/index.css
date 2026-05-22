@@ -1,0 +1,45 @@
+/**
+ * 全局样式入口文件
+ *
+ * 1. 引入 Tailwind CSS v4（通过 CSS import 方式，无需 tailwind.config.js）
+ * 2. 引入项目主题变量（明亮/暗黑模式的 CSS 自定义属性）
+ */
+
+/* Tailwind CSS v4 核心样式 */
+@import "tailwindcss";
+
+/* 项目主题变量（颜色、阴影等） */
+@import "./styles/theme.css";
+
+/**
+ * 全局基础样式
+ * 设置页面默认背景色和文字色，使用 CSS 变量实现主题切换
+ */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  /* 防止页面出现水平滚动条 */
+  overflow-x: hidden;
+}
+
+/**
+ * 主题切换过渡动画
+ *
+ * 需求 6.2 要求主题切换在 200ms 内完成。
+ * 通过对所有元素设置颜色相关属性的 transition，确保背景色、文字色、边框色等
+ * 在 .dark 类添加/移除时平滑过渡，而非突兀跳变。
+ *
+ * 为什么用 * 选择器？
+ * 因为 CSS 变量的值变化不会自动触发 transition，但引用变量的属性（如 background-color）
+ * 在变量值改变时会重新计算，此时如果该属性有 transition 就会产生动画效果。
+ * 所以需要在所有可能使用主题变量的元素上声明 transition。
+ */
+*,
+*::before,
+*::after {
+  transition: background-color 200ms ease-in-out,
+              color 200ms ease-in-out,
+              border-color 200ms ease-in-out,
+              box-shadow 200ms ease-in-out;
+}

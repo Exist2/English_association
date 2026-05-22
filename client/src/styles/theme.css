@@ -1,0 +1,75 @@
+/**
+ * 主题变量定义文件
+ *
+ * 使用 CSS 自定义属性（CSS Variables）实现明亮/暗黑主题切换。
+ * :root 定义明亮模式的默认颜色，.dark 类覆盖为暗黑模式颜色。
+ * 组件中通过 var(--color-xxx) 引用这些变量，切换主题时只需在 <html> 上添加/移除 .dark 类。
+ */
+
+/* ===== 明亮模式（默认） ===== */
+:root {
+  /* 背景色 */
+  --color-bg: #FAFCFB;               /* 页面主背景，微带暖灰 */
+  --color-bg-secondary: #F3F7F5;     /* 侧边栏、面板背景 */
+  --color-bg-editor: #FFFFFF;        /* 编辑区域纯白背景 */
+
+  /* 强调色（薄荷绿系列） */
+  --color-accent: #86EFAC;           /* 按钮、链接、活跃状态 */
+  --color-accent-light: #DCFCE7;     /* 选中态背景、hover 高亮 */
+  --color-accent-dark: #4ADE80;      /* 按钮 hover、重要操作 */
+
+  /* 文字色 */
+  --color-text-primary: #374151;     /* 正文文字（柔和深灰，非纯黑） */
+  --color-text-secondary: #9CA3AF;   /* 辅助说明、时间戳 */
+  --color-text-muted: #D1D5DB;       /* 占位符、禁用态文字 */
+
+  /* 边框色 */
+  --color-border: #F0F0F0;           /* 分割线、输入框边框（极淡） */
+  --color-border-focus: #86EFAC;     /* 输入框聚焦边框 */
+
+  /* 状态色 */
+  --color-success: #6EE7B7;          /* 保存成功、操作成功 */
+  --color-warning: #FCD34D;          /* 警告提示（柔和黄） */
+  --color-error: #FCA5A5;            /* 错误提示、验证失败（柔和红） */
+
+  /* 提示面板 */
+  --color-hint-bg: #F0FDF4;          /* Hint_Panel 背景 */
+  --color-hint-text: #6EE7B7;        /* Hint_Panel 联想文字 */
+
+  /* 阴影 */
+  --shadow-base: rgba(0, 0, 0, 0.03); /* 卡片、面板投影（极轻） */
+}
+
+/* ===== 暗黑模式 ===== */
+.dark {
+  /* 背景色（深蓝灰系列） */
+  --color-bg: #1A1B2E;               /* 页面主背景 */
+  --color-bg-secondary: #222338;     /* 侧边栏、面板背景 */
+  --color-bg-editor: #1E1F33;        /* 编辑区域背景 */
+
+  /* 强调色（柔和天蓝系列） */
+  --color-accent: #93C5FD;           /* 按钮、链接、活跃状态 */
+  --color-accent-light: #2A3A5E;     /* 选中态背景、hover 高亮 */
+  --color-accent-dark: #BFDBFE;      /* 按钮 hover、重要操作 */
+
+  /* 文字色 */
+  --color-text-primary: #E5E7EB;     /* 正文文字（柔和白，非纯白） */
+  --color-text-secondary: #9CA3AF;   /* 辅助说明、时间戳 */
+  --color-text-muted: #6B7280;       /* 占位符、禁用态文字 */
+
+  /* 边框色 */
+  --color-border: #2D2E42;           /* 分割线、输入框边框 */
+  --color-border-focus: #93C5FD;     /* 输入框聚焦边框 */
+
+  /* 状态色（暗黑模式下保持一致） */
+  --color-success: #6EE7B7;
+  --color-warning: #FCD34D;
+  --color-error: #FCA5A5;
+
+  /* 提示面板 */
+  --color-hint-bg: #252640;          /* Hint_Panel 背景 */
+  --color-hint-text: #93C5FD;        /* Hint_Panel 联想文字 */
+
+  /* 阴影（暗黑模式下加深） */
+  --shadow-base: rgba(0, 0, 0, 0.2);
+}
