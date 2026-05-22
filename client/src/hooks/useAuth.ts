@@ -14,7 +14,7 @@
 
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../services/api-client';
+import { authApi } from '../services/generated';
 
 /**
  * useAuth Hook 的返回值接口
@@ -30,22 +30,6 @@ export interface UseAuthReturn {
   sendSmsCode: (phone: string) => Promise<void>;
   /** 验证滑块验证码 */
   verifyCaptcha: (phone: string, token: string) => Promise<boolean>;
-}
-
-/**
- * 后端登录接口的响应数据格式
- */
-interface LoginResponse {
-  accessToken: string;
-  expiresIn: number;
-}
-
-/**
- * 后端验证码验证接口的响应数据格式
- */
-interface CaptchaResponse {
-  success: boolean;
-  canSendSms: boolean;
 }
 
 /**
@@ -82,11 +66,8 @@ export function useAuth(): UseAuthReturn {
    * @returns true 表示验证通过，false 表示验证失败
    */
   const verifyCaptcha = useCallback(async (phone: string, token: string): Promise<boolean> => {
-    const response = await apiClient.post<CaptchaResponse>('/auth/captcha/verify', {
-      phone,
-      captchaToken: token,
-    });
-    return response.data.success && response.data.canSendSms;
+    const response = await authApi.captchaVerify({ phone, captchaToken: token });
+    return !!response.data.success && !!response.data.canSendSms;
   }, []);
 
   /**
@@ -100,7 +81,7 @@ export function useAuth(): UseAuthReturn {
    * @throws 如果发送失败（如频率限制），会抛出错误
    */
   const sendSmsCode = useCallback(async (phone: string): Promise<void> => {
-    await apiClient.post('/auth/sms/send', { phone });
+    await authApi.sendSms({ phone });
   }, []);
 
   /**
@@ -117,13 +98,10 @@ export function useAuth(): UseAuthReturn {
    * @throws 如果登录失败（验证码错误、过期、账户锁定等），会抛出错误
    */
   const login = useCallback(async (phone: string, code: string): Promise<void> => {
-    const response = await apiClient.post<LoginResponse>('/auth/login', {
-      phone,
-      code,
-    });
+    const response = await authApi.login({ phone, code });
 
     // 将 JWT 令牌存储到 localStorage，后续请求会通过拦截器自动附加
-    localStorage.setItem('accessToken', response.data.accessToken);
+    localStorage.setItem('accessToken', response.data.accessToken!);
 
     // 更新组件内的登录状态
     setIsLoggedIn(true);

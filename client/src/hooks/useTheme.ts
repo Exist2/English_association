@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { apiClient } from '../services/api-client';
+import { settingsApi } from '../services/generated';
 
 /**
  * 主题配置接口
@@ -124,7 +124,7 @@ export function useTheme(): UseThemeReturn {
     // 设置新的 500ms 定时器
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        await apiClient.post('/settings/theme/update', {
+        await settingsApi.updateTheme({
           mode: config.mode,
           fontSize: config.fontSize,
           hintDuration: config.hintDuration,
@@ -154,7 +154,7 @@ export function useTheme(): UseThemeReturn {
 
       setIsLoading(true);
       try {
-        const response = await apiClient.get('/settings/theme');
+        const response = await settingsApi.getTheme();
         const serverConfig: ThemeConfig = {
           mode: response.data.mode === 'dark' ? 'dark' : 'light',
           fontSize: Math.min(24, Math.max(12, response.data.fontSize ?? 16)),
