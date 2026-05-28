@@ -21,6 +21,8 @@ interface ThemePanelProps {
   currentTheme: ThemeConfig;
   /** 主题配置变更回调，接收部分配置对象 */
   onThemeChange: (config: Partial<ThemeConfig>) => void;
+  /** 退出登录回调 */
+  onLogout?: () => void;
 }
 
 /**
@@ -35,7 +37,7 @@ interface ThemePanelProps {
  * @param props.currentTheme - 当前主题配置对象
  * @param props.onThemeChange - 配置变更时的回调函数
  */
-export function ThemePanel({ currentTheme, onThemeChange }: ThemePanelProps) {
+export function ThemePanel({ currentTheme, onThemeChange, onLogout }: ThemePanelProps) {
   /**
    * 处理主题模式切换
    * 在 light 和 dark 之间切换
@@ -160,6 +162,30 @@ export function ThemePanel({ currentTheme, onThemeChange }: ThemePanelProps) {
           <span>30秒</span>
         </div>
       </div>
+
+      {/* 退出登录按钮 */}
+      {onLogout && (
+        <div className="pt-3 border-t border-(--color-border)">
+          <button
+            onClick={onLogout}
+            className="
+              w-full flex items-center justify-center gap-2
+              px-3 py-2 rounded-md text-sm font-medium
+              text-red-600 dark:text-red-400
+              hover:bg-red-50 dark:hover:bg-red-900/20
+              transition-all duration-100 ease-out
+              cursor-pointer
+            "
+            aria-label="退出登录"
+          >
+            {/* 退出图标 */}
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>退出登录</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

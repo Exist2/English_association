@@ -10,7 +10,8 @@
 :root {
   /* 背景色 */
   --color-bg: #FAFCFB;               /* 页面主背景，微带暖灰 */
-  --color-bg-secondary: #F3F7F5;     /* 侧边栏、面板背景 */
+  --color-bg-secondary: #F7FAF9;     /* 侧边栏、面板背景（偏白一些，与中间内容区形成对比） */
+  --color-bg-content: #F2F5F4;       /* 中间内容区背景（编辑器外层、顶部工具栏），略深于主背景以区分层次 */
   --color-bg-editor: #FFFFFF;        /* 编辑区域纯白背景 */
 
   /* 强调色（薄荷绿系列） */
@@ -19,9 +20,9 @@
   --color-accent-dark: #4ADE80;      /* 按钮 hover、重要操作 */
 
   /* 文字色 */
-  --color-text-primary: #374151;     /* 正文文字（柔和深灰，非纯黑） */
-  --color-text-secondary: #9CA3AF;   /* 辅助说明、时间戳 */
-  --color-text-muted: #D1D5DB;       /* 占位符、禁用态文字 */
+  --color-text-primary: #1F2937;     /* 正文文字（加深，提高可读性） */
+  --color-text-secondary: #4B5563;   /* 辅助说明、配置项标签（加深） */
+  --color-text-muted: #9CA3AF;       /* 占位符、禁用态文字 */
 
   /* 边框色 */
   --color-border: #F0F0F0;           /* 分割线、输入框边框（极淡） */
@@ -44,7 +45,8 @@
 .dark {
   /* 背景色（深蓝灰系列） */
   --color-bg: #1A1B2E;               /* 页面主背景 */
-  --color-bg-secondary: #222338;     /* 侧边栏、面板背景 */
+  --color-bg-secondary: #2A2C44;     /* 侧边栏、面板背景（偏亮一些，与中间内容区形成对比） */
+  --color-bg-content: #16172A;       /* 中间内容区背景（编辑器外层、顶部工具栏），略深于主背景以区分层次 */
   --color-bg-editor: #1E1F33;        /* 编辑区域背景 */
 
   /* 强调色（柔和天蓝系列） */
@@ -53,8 +55,8 @@
   --color-accent-dark: #BFDBFE;      /* 按钮 hover、重要操作 */
 
   /* 文字色 */
-  --color-text-primary: #E5E7EB;     /* 正文文字（柔和白，非纯白） */
-  --color-text-secondary: #9CA3AF;   /* 辅助说明、时间戳 */
+  --color-text-primary: #F3F4F6;     /* 正文文字（加亮，提高可读性） */
+  --color-text-secondary: #D1D5DB;   /* 辅助说明、配置项标签（加亮） */
   --color-text-muted: #6B7280;       /* 占位符、禁用态文字 */
 
   /* 边框色 */

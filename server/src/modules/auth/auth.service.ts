@@ -47,6 +47,14 @@ const LOCK_DURATION_SECONDS = 900; // 15 分钟
 const SMS_CODE_TTL_SECONDS = 60; // 验证码有效期 60 秒
 const SMS_RATE_LIMIT_TTL_SECONDS = 60; // 发送频率限制 60 秒
 
+/** 测试号配置（从环境变量读取，使用函数延迟读取确保 ConfigModule 已加载） */
+function getTestPhone(): string {
+  return process.env.TEST_PHONE || '';
+}
+function getTestCode(): string {
+  return process.env.TEST_CODE || '';
+}
+
 /** Redis Key 前缀 */
 const REDIS_KEY_SMS_CODE = 'sms:code:';
 const REDIS_KEY_SMS_LIMIT = 'sms:limit:';
@@ -141,6 +149,12 @@ export class AuthService {
       throw new BadRequestException('手机号格式无效');
     }
 
+    // 测试号直接跳过发送，不走频率限制和 Redis 存储
+    if (getTestPhone() && phone === getTestPhone()) {
+      console.log(`[SMS Mock] 测试号 ${phone}，跳过验证码发送，使用固定验证码`);
+      return;
+    }
+
     const phoneHashValue = hashPhone(phone);
 
     // 步骤2：检查频率限制（同一手机号 60 秒内只能发送 1 次）
@@ -203,27 +217,36 @@ export class AuthService {
 
     // 步骤3：从 Redis 获取存储的验证码
     const codeKey = `${REDIS_KEY_SMS_CODE}${phoneHashValue}`;
-    const storedCode = await this.redis.get(codeKey);
 
-    // 步骤4：验证码校验
-    if (!storedCode) {
-      // 验证码不存在（已过期或未发送）
-      await this.incrementFailedAttempts(phoneHashValue);
-      throw new UnauthorizedException('验证码已过期，请重新获取');
+    // 测试号使用固定验证码，不走 Redis
+    if (getTestPhone() && getTestCode() && phone === getTestPhone()) {
+      if (code !== getTestCode()) {
+        throw new UnauthorizedException('验证码错误');
+      }
+      // 测试号验证通过，跳过 Redis 验证码校验，直接进入用户查找/创建流程
+    } else {
+      const storedCode = await this.redis.get(codeKey);
+
+      // 步骤4：验证码校验
+      if (!storedCode) {
+        // 验证码不存在（已过期或未发送）
+        await this.incrementFailedAttempts(phoneHashValue);
+        throw new UnauthorizedException('验证码已过期，请重新获取');
+      }
+
+      if (storedCode !== code) {
+        // 验证码不匹配
+        await this.incrementFailedAttempts(phoneHashValue);
+        throw new UnauthorizedException('验证码错误');
+      }
+
+      // 步骤5：验证码正确，清除相关记录
+      // 删除已使用的验证码（防止重复使用）
+      await this.redis.del(codeKey);
+      // 清除登录失败记录
+      const attemptKey = `${REDIS_KEY_LOGIN_ATTEMPT}${phoneHashValue}`;
+      await this.redis.del(attemptKey);
     }
-
-    if (storedCode !== code) {
-      // 验证码不匹配
-      await this.incrementFailedAttempts(phoneHashValue);
-      throw new UnauthorizedException('验证码错误');
-    }
-
-    // 步骤5：验证码正确，清除相关记录
-    // 删除已使用的验证码（防止重复使用）
-    await this.redis.del(codeKey);
-    // 清除登录失败记录
-    const attemptKey = `${REDIS_KEY_LOGIN_ATTEMPT}${phoneHashValue}`;
-    await this.redis.del(attemptKey);
 
     // 步骤6：查找用户（如果不存在则自动注册）
     let user = await this.userRepository.findOne({

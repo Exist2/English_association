@@ -43,3 +43,18 @@ body {
               border-color 200ms ease-in-out,
               box-shadow 200ms ease-in-out;
 }
+
+/**
+ * Toast 通知滑入动画
+ * 从顶部滑入并淡入，用于错误提示等 Toast 组件
+ */
+@keyframes slideDown {
+  from {
+    transform: translateX(-50%) translateY(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
