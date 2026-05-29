@@ -29,6 +29,8 @@ export interface ExportButtonProps {
   documentId: string | null;
   /** 文档内容是否为空 */
   isContentEmpty: boolean;
+  /** 当前文档标题，用于导出文件命名 */
+  documentTitle?: string;
 }
 
 /** 导出格式类型 */
@@ -53,7 +55,7 @@ const EXPORT_TIMEOUT_MS = 30000;
  * @param props - 包含 documentId 和 isContentEmpty
  * @returns JSX 元素
  */
-export function ExportButton({ documentId, isContentEmpty }: ExportButtonProps) {
+export function ExportButton({ documentId, isContentEmpty, documentTitle }: ExportButtonProps) {
   // ==================== 状态管理 ====================
 
   /** 下拉菜单是否展开 */
@@ -141,6 +143,11 @@ export function ExportButton({ documentId, isContentEmpty }: ExportButtonProps) 
    * @returns 文件名字符串
    */
   function extractFilename(contentDisposition: string | null, format: ExportFormat): string {
+    // 优先使用文档标题作为文件名
+    if (documentTitle && documentTitle.trim()) {
+      return `${documentTitle.trim()}.${format}`;
+    }
+
     // 默认文件名
     const defaultName = `文档.${format}`;
 

@@ -20,7 +20,7 @@
  * - 用户删除文档 → 如果是当前文档则清空编辑器
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { RichEditor } from '../components/RichEditor';
 import { HintPanel } from '../components/HintPanel';
 import { HistoryPanel } from '../components/HistoryPanel';
@@ -69,6 +69,15 @@ function EditorPage() {
   /** 用户最后输入的文本片段（用于触发联想） */
   const [lastTypedText, setLastTypedText] = useState<string>('');
 
+  /** 标题是否处于编辑模式 */
+  const [isTitleEditing, setIsTitleEditing] = useState(false);
+
+  /** 标题编辑中的临时值 */
+  const [editingTitle, setEditingTitle] = useState('');
+
+  /** 最近一次标题更新（传递给 HistoryPanel 同步列表显示） */
+  const [lastTitleUpdate, setLastTitleUpdate] = useState<{ id: string; title: string } | null>(null);
+
   /**
    * useRef 保存主题面板容器的 DOM 引用
    * 用于点击外部关闭面板
@@ -112,10 +121,54 @@ function EditorPage() {
   /**
    * useDocument - 文档管理
    * 提供文档加载方法（用于从历史面板选择文档后加载内容）
+   * 同时取出 documents 和 isLoading 用于判断空状态（是否需要展示引导页）
    */
-  const { loadDocument } = useDocument();
+  const { loadDocument, documents: initialDocuments, isLoading: isDocListLoading } = useDocument();
+
+  /**
+   * 是否存在文档的标志
+   * 初始值从 useDocument 的列表推导，后续通过创建/删除操作手动维护
+   * 这样即使 HistoryPanel 内部的 useDocument 实例和 EditorPage 的不同步，
+   * 也能正确判断空状态
+   */
+  const [hasDocuments, setHasDocuments] = useState<boolean | null>(null);
+
+  /**
+   * 当文档列表首次加载完成后：
+   * - 如果有文档：自动加载第一篇（最近修改的）到编辑器
+   * - 如果没有文档：标记为空状态，展示引导页
+   *
+   * hasDocuments 为 null 表示尚未确定（正在加载中）
+   */
+  useEffect(() => {
+    if (!isDocListLoading && hasDocuments === null) {
+      if (initialDocuments.length > 0) {
+        setHasDocuments(true);
+        // 自动加载第一篇文档（列表按 updatedAt 降序，第一条即最近修改的）
+        const firstDoc = initialDocuments[0];
+        loadDocument(firstDoc.id).then((doc) => {
+          setCurrentDocId(firstDoc.id);
+          setCurrentDocTitle(doc.title);
+          setEditorContent(doc.content);
+        }).catch(() => {
+          // 加载失败时不阻塞，用户可以手动从历史面板选择
+        });
+      } else {
+        setHasDocuments(false);
+      }
+    }
+  }, [isDocListLoading, initialDocuments, hasDocuments, loadDocument]);
 
   // ==================== 事件处理函数 ====================
+
+  /**
+   * 是否展示空状态引导页
+   *
+   * 条件：文档列表加载完成 + 确认无文档 + 当前没有打开的文档
+   * 当用户通过空状态页创建文档后，currentDocId 会被设置 + hasDocuments 变为 true
+   * 当用户删除最后一篇文档后，handleDocumentDelete 会将 hasDocuments 设为 false
+   */
+  const showEmptyState = hasDocuments === false && !currentDocId;
 
   /**
    * 处理编辑器内容变更
@@ -211,6 +264,8 @@ function EditorPage() {
         setCurrentDocTitle(title);
         setEditorContent('');
         setLastTypedText('');
+        // 标记已有文档，退出空状态
+        setHasDocuments(true);
       }
     } catch {
       // 创建失败，静默处理（可以后续添加 Toast 提示）
@@ -244,7 +299,133 @@ function EditorPage() {
     setIsThemePanelOpen((prev) => !prev);
   }, []);
 
+  /**
+   * 双击标题进入编辑模式
+   * 仅在有文档加载时允许编辑
+   */
+  const handleTitleDoubleClick = useCallback(() => {
+    if (!currentDocId) return;
+    setEditingTitle(currentDocTitle);
+    setIsTitleEditing(true);
+  }, [currentDocId, currentDocTitle]);
+
+  /**
+   * 标题输入框失去焦点时保存
+   * 验证标题长度（1-50 字符），有效则调用 API 保存，无效则回退
+   */
+  const handleTitleBlur = useCallback(async () => {
+    setIsTitleEditing(false);
+    const trimmed = editingTitle.trim();
+
+    // 标题未变化或为空时不保存
+    if (!trimmed || trimmed === currentDocTitle || !currentDocId) return;
+
+    // 标题长度校验（1-50 字符）
+    if (trimmed.length > 50) return;
+
+    // 乐观更新：先更新本地状态
+    setCurrentDocTitle(trimmed);
+    // 通知 HistoryPanel 同步标题
+    setLastTitleUpdate({ id: currentDocId, title: trimmed });
+
+    // 调用 API 持久化
+    try {
+      await documentApi.update(currentDocId, { title: trimmed });
+    } catch {
+      // 保存失败时回退标题
+      setCurrentDocTitle(currentDocTitle);
+      setLastTitleUpdate(null);
+      console.error('标题保存失败');
+    }
+  }, [editingTitle, currentDocTitle, currentDocId]);
+
+  /**
+   * 标题输入框按下 Enter 时确认编辑（触发 blur）
+   * 按下 Escape 时取消编辑
+   */
+  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      // Enter 确认：让 input 失去焦点，触发 handleTitleBlur
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      // Escape 取消：恢复原标题并退出编辑模式
+      setEditingTitle(currentDocTitle);
+      setIsTitleEditing(false);
+    }
+  }, [currentDocTitle]);
+
   // ==================== 渲染 ====================
+
+  /**
+   * 空状态引导页
+   * 当用户没有任何文档时展示，隐藏历史面板、编辑器、工具栏
+   * 居中显示欢迎文案和新建文档按钮
+   */
+  if (showEmptyState) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[var(--color-bg)]">
+        <div className="flex flex-col items-center gap-6 px-4 text-center">
+          {/* 欢迎文案 */}
+          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">
+            欢迎使用英文联想编辑器
+          </h1>
+
+          {/* 新建文档按钮 - 样式与 ThemePanel 主题模式按钮一致 */}
+          <button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="
+              flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium
+              bg-[var(--color-accent-light)] text-[var(--color-text-primary)]
+              hover:bg-[var(--color-accent)] hover:text-gray-800
+              transition-all duration-200 ease-in-out
+              cursor-pointer
+            "
+          >
+            {/* 加号图标 */}
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span>新建文档</span>
+          </button>
+        </div>
+
+        {/* 新建文档对话框（空状态下也需要） */}
+        <CreateDocDialog
+          open={isCreateDialogOpen}
+          onClose={() => setIsCreateDialogOpen(false)}
+          onCreate={handleCreateDocument}
+        />
+      </div>
+    );
+  }
+
+  /**
+   * 加载中状态
+   * 文档列表正在加载时展示 loading 指示器
+   */
+  if (hasDocuments === null && isDocListLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[var(--color-bg)]">
+        <div className="flex flex-col items-center gap-3">
+          {/* 旋转加载图标 */}
+          <svg
+            className="w-8 h-8 animate-spin text-[var(--color-accent)]"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-sm text-[var(--color-text-secondary)]">加载中...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[var(--color-bg)] overflow-hidden">
@@ -265,6 +446,8 @@ function EditorPage() {
         onDocumentSelect={handleDocumentSelect}
         onDocumentDelete={handleDocumentDelete}
         currentDocId={currentDocId}
+        onListEmpty={() => setHasDocuments(false)}
+        updatedDocTitle={lastTitleUpdate}
       />
 
       {/* ===== 右侧：主内容区域 =====
@@ -310,11 +493,51 @@ function EditorPage() {
             />
           </div>
 
-          {/* 中间：文档标题 */}
-          <div className="flex-1 text-center px-4 truncate">
-            <span className="text-sm font-medium text-[var(--color-text-primary)]">
-              {currentDocTitle || '未选择文档'}
-            </span>
+          {/* 中间：文档标题（点击编辑图标进入编辑模式） */}
+          <div className="flex-1 flex items-center justify-center px-4 min-w-0">
+            {isTitleEditing ? (
+              <input
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={handleTitleKeyDown}
+                maxLength={50}
+                autoFocus
+                className="
+                  w-full max-w-[300px] text-center
+                  text-sm font-medium text-[var(--color-text-primary)]
+                  bg-transparent border-b border-[var(--color-border-focus)]
+                  focus:outline-none
+                  transition-colors duration-200
+                "
+              />
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+                  {currentDocTitle || '未选择文档'}
+                </span>
+                {/* 编辑图标：仅在有文档时显示，点击进入标题编辑模式 */}
+                {currentDocId && (
+                  <button
+                    onClick={handleTitleDoubleClick}
+                    className="
+                      shrink-0 p-0.5 rounded
+                      text-[var(--color-text-muted)]
+                      hover:text-[var(--color-text-secondary)]
+                      transition-colors duration-100
+                    "
+                    aria-label="编辑标题"
+                    title="编辑标题"
+                  >
+                    {/* 铅笔编辑图标 */}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 右侧：新建文档 + 主题设置 + 导出按钮 */}
@@ -390,6 +613,7 @@ function EditorPage() {
             <ExportButton
               documentId={currentDocId}
               isContentEmpty={!editorContent}
+              documentTitle={currentDocTitle}
             />
           </div>
         </header>
@@ -403,7 +627,7 @@ function EditorPage() {
          *   所以编辑区无需额外计算即可自适应
          */}
         <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 flex flex-col px-4 md:px-16 lg:px-[130px]">
+          <div className="relative flex-1 min-h-0 flex flex-col px-4 md:px-16 lg:px-[130px]">
             {/* 富文本编辑器：flex-1 占满剩余高度，min-h-0 防止 flex 子项被内容撑高 */}
             <div className="flex-1 min-h-0">
               <RichEditor
@@ -413,8 +637,8 @@ function EditorPage() {
               />
             </div>
 
-            {/* 联想提示面板（编辑器下方，shrink-0 保证内容固定高度不被挤压） */}
-            <div className="shrink-0">
+            {/* 联想提示面板（绝对定位在编辑器底部，不占据文档流，避免出现/消失时引起页面重排） */}
+            <div className="absolute bottom-2 left-4 right-4 md:left-16 md:right-16 lg:left-[130px] lg:right-[130px] z-10 pointer-events-none">
               <HintPanel
                 hints={hints}
                 isVisible={isHintVisible}

@@ -16,7 +16,7 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Toolbar } from './Toolbar';
 
 /**
@@ -93,6 +93,42 @@ export function RichEditor({ content, onChange, editable = true }: RichEditorPro
       },
     },
   });
+
+  /**
+   * 当外部 content prop 变化时，同步更新编辑器内容
+   *
+   * Tiptap 的 useEditor 只在初始化时读取 content 参数，
+   * 后续 prop 变化不会自动反映到编辑器中。
+   * 需要手动调用 setContent 来更新。
+   *
+   * emitUpdate: false 防止触发 onUpdate 回调（避免循环更新）
+   */
+  useEffect(() => {
+    if (!editor) return;
+    const currentJson = JSON.stringify(editor.getJSON());
+    // 只在内容确实不同时才更新，避免光标位置丢失
+    if (content && content !== currentJson) {
+      editor.commands.setContent(JSON.parse(content), { emitUpdate: false });
+    } else if (!content) {
+      editor.commands.clearContent();
+    }
+  }, [editor, content]);
+
+  /**
+   * 当外部 editable prop 变化时，同步更新编辑器的可编辑状态
+   * 并在变为可编辑时自动聚焦编辑器
+   */
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(editable);
+    // 变为可编辑时自动聚焦，让用户可以直接开始输入
+    if (editable) {
+      // 使用 setTimeout 确保 DOM 更新完成后再聚焦
+      setTimeout(() => {
+        editor.commands.focus('end');
+      }, 50);
+    }
+  }, [editor, editable]);
 
   return (
     <div className="flex flex-col h-full bg-[var(--color-bg-editor)] rounded-lg shadow-[0_1px_3px_var(--shadow-base)]">

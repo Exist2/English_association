@@ -4,13 +4,17 @@
  * 用途：处理文本语言检测和联想/翻译请求的核心业务逻辑。
  * 主要功能：
  * 1. 检测用户输入的语言类型（中文/英文/未知）
- * 2. 中文输入 → 调用 AI 翻译为英文
- * 3. 英文输入 → 调用 AI 获取联想词汇
+ * 2. 中文输入 → 调用通义千问 AI 翻译为英文
+ * 3. 英文输入 → 调用通义千问 AI 获取联想词汇
  * 4. 整合以上逻辑，返回最多5条结果
  *
- * 当前实现使用 Mock 数据，后续接入真实 AI API 时替换 getTranslation 和 getAssociation 方法即可。
+ * AI 对接方式：
+ * 通义千问（Qwen）兼容 OpenAI 协议，使用 openai npm 包调用，
+ * 只需将 baseURL 指向阿里云百炼平台的兼容端点即可。
  */
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import OpenAI from 'openai';
 import { AssociationResult } from './interfaces';
 
 /**
@@ -19,8 +23,47 @@ import { AssociationResult } from './interfaces';
  */
 const MAX_RESULTS = 5;
 
+/**
+ * AI 请求超时时间（毫秒）
+ * 超过此时间未响应则放弃请求，返回空结果
+ */
+const AI_TIMEOUT_MS = 8000;
+
 @Injectable()
 export class AssociationService {
+  private readonly logger = new Logger(AssociationService.name);
+
+  /**
+   * OpenAI 客户端实例
+   * 通过 OpenAI 兼容协议连接通义千问（Qwen）
+   * baseURL 指向阿里云百炼平台的兼容端点
+   */
+  private openai: OpenAI;
+
+  /** 使用的模型名称（如 qwen-turbo、qwen-plus） */
+  private model: string;
+
+  constructor(private configService: ConfigService) {
+    /**
+     * 初始化 OpenAI 客户端
+     *
+     * 为什么用 OpenAI SDK 调用通义千问？
+     * 因为通义千问提供了 OpenAI 兼容的 API 端点，
+     * 这样可以复用成熟的 openai npm 包，无需额外学习新 SDK。
+     * 只需要修改 baseURL 和 apiKey 即可。
+     */
+    this.openai = new OpenAI({
+      apiKey: this.configService.get<string>('DASHSCOPE_API_KEY'),
+      baseURL: this.configService.get<string>(
+        'QWEN_BASE_URL',
+        'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      ),
+      timeout: AI_TIMEOUT_MS,
+    });
+
+    this.model = this.configService.get<string>('QWEN_MODEL', 'qwen-turbo');
+  }
+
   /**
    * 检测文本的语言类型
    *
@@ -74,87 +117,88 @@ export class AssociationService {
   /**
    * 获取中文文本的英文翻译
    *
-   * 当前为 Mock 实现，返回模拟的翻译结果。
-   * TODO: 接入真实 AI 翻译服务（如 OpenAI、百度翻译 API）
+   * 调用通义千问 AI，通过精心设计的 prompt 让模型返回多种翻译方式。
+   * 使用较高的 temperature（0.8）以获得多样化的翻译结果。
    *
-   * @param text - 中文文本
+   * @param text - 中文文本（至少1个中文字符）
    * @returns 翻译结果数组，最多5条
    *
    * @example
-   * await getTranslation('你好') // [{ id: '...', text: 'Hello', type: 'translation' }, ...]
+   * await getTranslation('你好') // [{ text: 'Hello', ... }, { text: 'Hi there', ... }]
    */
   async getTranslation(text: string): Promise<AssociationResult[]> {
-    // TODO: 替换为真实 AI 翻译 API 调用
-    // 示例：const response = await this.httpService.post('https://api.openai.com/...', { text });
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: `你是一个英语翻译助手。用户输入中文，你需要提供最多5种不同的英文翻译。
+要求：
+1. 每行一个翻译，不要编号，不要解释
+2. 翻译要自然地道，覆盖不同表达方式（正式/口语/简洁等）
+3. 只输出英文翻译，不要输出其他内容
+4. 如果输入很短（1-2个字），也尽量给出不同语境下的翻译`,
+          },
+          {
+            role: 'user',
+            content: text,
+          },
+        ],
+        temperature: 0.8,
+        max_tokens: 200,
+      });
 
-    // Mock 实现：根据输入文本生成模拟翻译结果
-    // 实际项目中这里会调用 AI API 并解析返回的翻译结果
-    const mockTranslations: AssociationResult[] = [
-      {
-        id: this.generateId(),
-        text: `[Translation of "${text}"]`,
-        type: 'translation',
-        confidence: 0.95,
-      },
-      {
-        id: this.generateId(),
-        text: `[Alternative translation of "${text}"]`,
-        type: 'translation',
-        confidence: 0.85,
-      },
-      {
-        id: this.generateId(),
-        text: `[Literal translation of "${text}"]`,
-        type: 'translation',
-        confidence: 0.75,
-      },
-    ];
-
-    // 确保不超过最大结果数
-    return mockTranslations.slice(0, MAX_RESULTS);
+      const content = response.choices[0]?.message?.content || '';
+      return this.parseResults(content, 'translation');
+    } catch (error) {
+      this.logger.error(`AI 翻译请求失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      return [];
+    }
   }
 
   /**
-   * 获取英文文本的联想词汇
+   * 获取英文文本的联想词汇/句子
    *
-   * 当前为 Mock 实现，返回模拟的联想结果。
-   * TODO: 接入真实 AI 联想服务（如 OpenAI API）
+   * 调用通义千问 AI，让模型基于用户输入的英文片段进行补全和联想。
+   * 使用较高的 temperature（0.9）以获得更有创意的联想结果。
    *
-   * @param text - 英文文本
+   * @param text - 英文文本（至少2个英文字符）
    * @returns 联想结果数组，最多5条
    *
    * @example
-   * await getAssociation('hel') // [{ id: '...', text: 'hello', type: 'association' }, ...]
+   * await getAssociation('import') // [{ text: 'important', ... }, { text: 'import duty', ... }]
    */
   async getAssociation(text: string): Promise<AssociationResult[]> {
-    // TODO: 替换为真实 AI 联想 API 调用
-    // 示例：const response = await this.httpService.post('https://api.openai.com/...', { text, mode: 'completion' });
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: `你是一个英语写作助手。用户输入英文单词或短语，你需要提供最多5个相关的英文联想词汇或句子补全。
+要求：
+1. 每行一个联想结果，不要编号，不要解释
+2. 可以是：单词补全、相关短语、包含该词的常用句子
+3. 结果要实用，帮助用户扩展写作思路
+4. 只输出英文，不要输出中文
+5. 优先给出与输入最相关的补全`,
+          },
+          {
+            role: 'user',
+            content: text,
+          },
+        ],
+        temperature: 0.9,
+        max_tokens: 300,
+      });
 
-    // Mock 实现：根据输入文本生成模拟联想结果
-    // 实际项目中这里会调用 AI API 并解析返回的联想词汇/句子
-    const mockAssociations: AssociationResult[] = [
-      {
-        id: this.generateId(),
-        text: `${text}ing`,
-        type: 'association',
-        confidence: 0.9,
-      },
-      {
-        id: this.generateId(),
-        text: `${text}tion`,
-        type: 'association',
-        confidence: 0.8,
-      },
-      {
-        id: this.generateId(),
-        text: `${text} is important`,
-        type: 'association',
-        confidence: 0.7,
-      },
-    ];
-
-    // 确保不超过最大结果数
-    return mockAssociations.slice(0, MAX_RESULTS);
+      const content = response.choices[0]?.message?.content || '';
+      return this.parseResults(content, 'association');
+    } catch (error) {
+      this.logger.error(`AI 联想请求失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      return [];
+    }
   }
 
   /**
@@ -201,11 +245,39 @@ export class AssociationService {
   }
 
   /**
+   * 解析 AI 返回的多行文本为结构化结果数组
+   *
+   * AI 返回的格式是每行一个结果的纯文本，这里将其转换为 AssociationResult 数组。
+   * 同时处理 AI 可能添加的编号前缀（如 "1. "、"1) "、"1、"）。
+   *
+   * @param content - AI 返回的原始文本
+   * @param type - 结果类型（translation 或 association）
+   * @returns 结构化的联想结果数组
+   */
+  private parseResults(
+    content: string,
+    type: 'translation' | 'association',
+  ): AssociationResult[] {
+    return content
+      .split('\n') // 按行分割
+      .map((line) => line.trim()) // 去除首尾空白
+      .filter((line) => line.length > 0) // 过滤空行
+      .slice(0, MAX_RESULTS) // 最多5条
+      .map((line, index) => ({
+        id: this.generateId(),
+        // 去除 AI 可能添加的编号前缀（如 "1. "、"1) "、"1、"、"- "）
+        text: line.replace(/^[\d]+[.\)、]\s*/, '').replace(/^[-•]\s*/, ''),
+        type,
+        // 按顺序递减置信度（第一条最相关）
+        confidence: 1 - index * 0.1,
+      }));
+  }
+
+  /**
    * 生成简单的唯一 ID
    *
    * 使用时间戳 + 随机数生成伪唯一 ID。
-   * 注意：这不是真正的 UUID，仅用于 Mock 数据。
-   * 实际项目中应使用 uuid 库或数据库自动生成。
+   * 在高并发场景下可能有极小概率重复，但对于联想结果的临时标识足够使用。
    *
    * @returns 伪唯一 ID 字符串
    */

@@ -41,6 +41,10 @@ export interface HistoryPanelProps {
   onDocumentDelete: (docId: string) => void;
   /** 当前正在编辑的文档 ID（用于高亮显示） */
   currentDocId: string | null;
+  /** 文档列表变为空时的回调（用于触发空状态引导页） */
+  onListEmpty?: () => void;
+  /** 外部更新的文档标题（id + 新标题），变化时同步到列表 */
+  updatedDocTitle?: { id: string; title: string } | null;
 }
 
 /**
@@ -108,6 +112,8 @@ export function HistoryPanel({
   onDocumentSelect,
   onDocumentDelete,
   currentDocId,
+  onListEmpty,
+  updatedDocTitle,
 }: HistoryPanelProps) {
   /** 搜索输入框的值 */
   const [searchInput, setSearchInput] = useState('');
@@ -136,6 +142,7 @@ export function HistoryPanel({
     searchKeyword,
     loadError,
     clearLoadError,
+    updateLocalTitle,
   } = useDocument();
 
   /**
@@ -151,6 +158,16 @@ export function HistoryPanel({
     search(debouncedSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
+
+  /**
+   * 当外部更新了文档标题时，同步到本地列表
+   * 这样用户在顶部工具栏双击编辑标题后，左侧历史列表也能实时反映新标题
+   */
+  useEffect(() => {
+    if (updatedDocTitle && updatedDocTitle.id && updatedDocTitle.title) {
+      updateLocalTitle(updatedDocTitle.id, updatedDocTitle.title);
+    }
+  }, [updatedDocTitle, updateLocalTitle]);
 
   /**
    * 滚动事件处理
@@ -209,13 +226,20 @@ export function HistoryPanel({
       await deleteDocument(deleteTarget.id);
       onDocumentDelete(deleteTarget.id);
       setDeleteTarget(null);
+
+      // 删除后检查列表是否为空（documents 此时还未更新，需要减 1 判断）
+      // deleteDocument 内部会 setDocuments(prev => prev.filter(...))，
+      // 但由于 React 批量更新，这里 documents 还是旧值
+      if (documents.length <= 1 && onListEmpty) {
+        onListEmpty();
+      }
     } catch {
       // 删除失败，保持对话框打开让用户重试
       console.error('删除文档失败');
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteTarget, deleteDocument, onDocumentDelete]);
+  }, [deleteTarget, deleteDocument, onDocumentDelete, documents.length, onListEmpty]);
 
   /**
    * 取消删除

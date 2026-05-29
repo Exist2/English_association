@@ -24,6 +24,19 @@ body {
 }
 
 /**
+ * 所有按钮默认使用手型光标
+ * 避免在每个按钮组件上重复添加 cursor-pointer 类
+ * disabled 状态下切换为禁止光标
+ */
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/**
  * 主题切换过渡动画
  *
  * 需求 6.2 要求主题切换在 200ms 内完成。

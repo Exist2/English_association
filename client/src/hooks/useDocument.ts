@@ -52,6 +52,8 @@ export interface UseDocumentReturn {
   loadError: string | null;
   /** 清除加载错误 */
   clearLoadError: () => void;
+  /** 更新本地列表中某个文档的标题（不发起网络请求） */
+  updateLocalTitle: (docId: string, newTitle: string) => void;
 }
 
 /** 每页加载的文档数量 */
@@ -73,8 +75,8 @@ const PAGE_SIZE = 20;
 export function useDocument(): UseDocumentReturn {
   /** 文档列表 */
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
-  /** 是否正在加载（首次加载或搜索时） */
-  const [isLoading, setIsLoading] = useState(false);
+  /** 是否正在加载（首次加载或搜索时），初始为 true 因为挂载时会立即发起请求 */
+  const [isLoading, setIsLoading] = useState(true);
   /** 是否还有更多数据 */
   const [hasMore, setHasMore] = useState(true);
   /** 当前页码（从 1 开始） */
@@ -231,6 +233,19 @@ export function useDocument(): UseDocumentReturn {
     setLoadError(null);
   }, []);
 
+  /**
+   * 更新本地列表中某个文档的标题
+   * 用于外部修改标题后同步到列表显示，不发起网络请求
+   *
+   * @param docId - 文档 ID
+   * @param newTitle - 新标题
+   */
+  const updateLocalTitle = useCallback((docId: string, newTitle: string) => {
+    setDocuments((prev) =>
+      prev.map((doc) => (doc.id === docId ? { ...doc, title: newTitle } : doc))
+    );
+  }, []);
+
   return {
     documents,
     isLoading,
@@ -242,5 +257,6 @@ export function useDocument(): UseDocumentReturn {
     searchKeyword,
     loadError,
     clearLoadError,
+    updateLocalTitle,
   };
 }
