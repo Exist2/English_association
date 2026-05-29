@@ -16,9 +16,31 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
 import { useCallback, useEffect } from 'react';
 import { Toolbar } from './Toolbar';
 
+/**
+ * 编辑器扩展配置（模块级常量）
+ *
+ * 提取为常量避免每次组件渲染时创建新的数组引用，
+ * 确保 useEditor 不会因为引用变化而产生意外行为。
+ */
+const EDITOR_EXTENSIONS = [
+  StarterKit.configure({
+    heading: {
+      levels: [1, 2, 3, 4],
+    },
+  }),
+  Underline,
+  /**
+   * TextAlign 扩展：支持文本对齐（左对齐、居中、右对齐、两端对齐）
+   * types 指定哪些节点类型支持对齐，这里包含标题和段落
+   */
+  TextAlign.configure({
+    types: ['heading', 'paragraph'],
+  }),
+];
 /**
  * RichEditor 组件的 Props 接口
  */
@@ -68,14 +90,7 @@ export function RichEditor({ content, onChange, editable = true }: RichEditorPro
    * Heading 配置 levels: [1,2,3,4] 限制只支持 H1-H4
    */
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3, 4],
-        },
-      }),
-      Underline,
-    ],
+    extensions: EDITOR_EXTENSIONS,
     content: content ? JSON.parse(content) : undefined,
     editable,
     onUpdate: handleUpdate,

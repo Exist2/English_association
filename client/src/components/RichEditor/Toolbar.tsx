@@ -155,6 +155,53 @@ export function Toolbar({ editor }: ToolbarProps) {
       >
         1. 列表
       </ToolbarButton>
+
+      <Divider />
+
+      {/* 对齐方式 */}
+      <ToolbarButton
+        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+        isActive={editor.isActive({ textAlign: 'left' })}
+        title="左对齐"
+      >
+        {/* 左对齐图标 */}
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M3 12h12M3 18h18" />
+        </svg>
+      </ToolbarButton>
+
+      <ToolbarButton
+        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+        isActive={editor.isActive({ textAlign: 'center' })}
+        title="居中对齐"
+      >
+        {/* 居中对齐图标 */}
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M6 12h12M3 18h18" />
+        </svg>
+      </ToolbarButton>
+
+      <ToolbarButton
+        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+        isActive={editor.isActive({ textAlign: 'right' })}
+        title="右对齐"
+      >
+        {/* 右对齐图标 */}
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M9 12h12M3 18h18" />
+        </svg>
+      </ToolbarButton>
+
+      <ToolbarButton
+        onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+        isActive={editor.isActive({ textAlign: 'justify' })}
+        title="两端对齐"
+      >
+        {/* 两端对齐图标 */}
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
+      </ToolbarButton>
     </div>
   );
 }
