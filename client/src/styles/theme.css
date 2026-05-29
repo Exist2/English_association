@@ -1,77 +1,120 @@
 /**
  * 主题变量定义文件
  *
- * 使用 CSS 自定义属性（CSS Variables）实现明亮/暗黑主题切换。
- * :root 定义明亮模式的默认颜色，.dark 类覆盖为暗黑模式颜色。
+ * 基于蓝紫色调的现代化色彩系统，包含完整的 hover 交互状态和明暗两种主题。
+ * :root 定义浅色模式的默认颜色，.dark 类覆盖为深色模式颜色。
  * 组件中通过 var(--color-xxx) 引用这些变量，切换主题时只需在 <html> 上添加/移除 .dark 类。
+ *
+ * 色彩哲学：
+ * - 主色调：优雅的蓝紫色 (#6366f1) - 现代、专业、富有活力
+ * - 强调色：明亮的青色 (#0ea5e9) - 形成和谐的色彩对比
+ * - 背景色：柔和的浅灰蓝 (#f8f9fd) - 舒适不刺眼
  */
 
-/* ===== 明亮模式（默认） ===== */
+/* ===== 浅色主题（默认） ===== */
 :root {
   /* 背景色 */
-  --color-bg: #FAFCFB;               /* 页面主背景，微带暖灰 */
-  --color-bg-secondary: #F7FAF9;     /* 侧边栏、面板背景（偏白一些，与中间内容区形成对比） */
-  --color-bg-content: #F2F5F4;       /* 中间内容区背景（编辑器外层、顶部工具栏），略深于主背景以区分层次 */
-  --color-bg-editor: #FFFFFF;        /* 编辑区域纯白背景 */
+  --color-bg: #f8f9fd;                /* 页面主背景（柔和浅灰蓝） */
+  --color-bg-secondary: #ffffff;      /* 侧边栏、面板背景（纯白） */
+  --color-bg-content: #f1f3f9;        /* 中间内容区背景（略深于主背景） */
+  --color-bg-editor: #ffffff;         /* 编辑区域纯白背景 */
 
-  /* 强调色（薄荷绿系列） */
-  --color-accent: #86EFAC;           /* 按钮、链接、活跃状态 */
-  --color-accent-light: #DCFCE7;     /* 选中态背景、hover 高亮 */
-  --color-accent-dark: #4ADE80;      /* 按钮 hover、重要操作 */
+  /* 主色（蓝紫色系列） */
+  --color-primary: #6366f1;           /* 主色 - 按钮、链接、活跃状态 */
+  --color-primary-hover: #4f46e5;     /* 主色 hover 加深 */
+  --color-primary-active: #4338ca;    /* 主色按压时更深 */
+  --color-primary-light: #eef2ff;     /* 主色浅色背景（选中态、hover 高亮） */
+
+  /* 强调色（青色系列 - 用于次要操作、信息提示） */
+  --color-accent: #6366f1;            /* 组件中的主操作色（映射到主色） */
+  --color-accent-hover: #4f46e5;      /* 强调色 hover */
+  --color-accent-light: #eef2ff;      /* 选中态背景、hover 高亮（映射到主色浅色） */
+  --color-accent-dark: #4f46e5;       /* 按钮 hover（映射到主色 hover） */
 
   /* 文字色 */
-  --color-text-primary: #1F2937;     /* 正文文字（加深，提高可读性） */
-  --color-text-secondary: #4B5563;   /* 辅助说明、配置项标签（加深） */
-  --color-text-muted: #9CA3AF;       /* 占位符、禁用态文字 */
+  --color-text-primary: #1e293b;      /* 正文文字（深蓝灰） */
+  --color-text-secondary: #475569;    /* 辅助说明、标签 */
+  --color-text-muted: #94a3b8;        /* 占位符、禁用态文字 */
 
   /* 边框色 */
-  --color-border: #F0F0F0;           /* 分割线、输入框边框（极淡） */
-  --color-border-focus: #86EFAC;     /* 输入框聚焦边框 */
+  --color-border: #e2e8f0;            /* 分割线、输入框边框 */
+  --color-border-hover: #cbd5e1;      /* 边框 hover 加深 */
+  --color-border-focus: #6366f1;      /* 输入框聚焦边框（主色） */
 
-  /* 状态色 */
-  --color-success: #6EE7B7;          /* 保存成功、操作成功 */
-  --color-warning: #FCD34D;          /* 警告提示（柔和黄） */
-  --color-error: #FCA5A5;            /* 错误提示、验证失败（柔和红） */
+  /* 语义色 - 成功 */
+  --color-success: #10b981;           /* 保存成功、操作成功 */
+  --color-success-hover: #059669;     /* 成功色 hover */
+  --color-success-light: #d1fae5;     /* 成功色浅色背景 */
+
+  /* 语义色 - 警告 */
+  --color-warning: #f59e0b;           /* 警告提示 */
+  --color-warning-hover: #d97706;     /* 警告色 hover */
+  --color-warning-light: #fef3c7;     /* 警告色浅色背景 */
+
+  /* 语义色 - 错误/危险 */
+  --color-error: #ef4444;             /* 错误提示、删除操作 */
+  --color-error-hover: #dc2626;       /* 错误色 hover */
+  --color-error-light: #fee2e2;       /* 错误色浅色背景 */
 
   /* 提示面板 */
-  --color-hint-bg: #F0FDF4;          /* Hint_Panel 背景 */
-  --color-hint-text: #6EE7B7;        /* Hint_Panel 联想文字 */
+  --color-hint-bg: #eef2ff;           /* Hint_Panel 背景（主色浅色） */
+  --color-hint-text: #6366f1;         /* Hint_Panel 联想文字（主色） */
 
   /* 阴影 */
-  --shadow-base: rgba(0, 0, 0, 0.03); /* 卡片、面板投影（极轻） */
+  --shadow-base: rgba(0, 0, 0, 0.04); /* 卡片、面板投影 */
+  --shadow-hover: rgba(0, 0, 0, 0.08); /* hover 时加深阴影 */
 }
 
-/* ===== 暗黑模式 ===== */
+/* ===== 深色主题 ===== */
 .dark {
-  /* 背景色（深蓝灰系列） */
-  --color-bg: #1A1B2E;               /* 页面主背景 */
-  --color-bg-secondary: #2A2C44;     /* 侧边栏、面板背景（偏亮一些，与中间内容区形成对比） */
-  --color-bg-content: #16172A;       /* 中间内容区背景（编辑器外层、顶部工具栏），略深于主背景以区分层次 */
-  --color-bg-editor: #1E1F33;        /* 编辑区域背景 */
+  /* 背景色（深蓝灰色调） */
+  --color-bg: #0f172a;                /* 页面主背景（深蓝灰） */
+  --color-bg-secondary: #1e293b;      /* 侧边栏、面板背景 */
+  --color-bg-content: #0c1322;        /* 中间内容区背景（略深于主背景） */
+  --color-bg-editor: #1e293b;         /* 编辑区域背景 */
 
-  /* 强调色（柔和天蓝系列） */
-  --color-accent: #93C5FD;           /* 按钮、链接、活跃状态 */
-  --color-accent-light: #2A3A5E;     /* 选中态背景、hover 高亮 */
-  --color-accent-dark: #BFDBFE;      /* 按钮 hover、重要操作 */
+  /* 主色 - 更亮的变体（深色背景上需要更亮的颜色） */
+  --color-primary: #818cf8;           /* 主色 */
+  --color-primary-hover: #a5b4fc;     /* 主色 hover 变亮 */
+  --color-primary-active: #c7d2fe;    /* 主色按压时更亮 */
+  --color-primary-light: #1e1b4b;     /* 主色深色背景（选中态） */
+
+  /* 强调色（组件兼容 - 映射到主色系列） */
+  --color-accent: #818cf8;            /* 组件中的主操作色（映射到主色） */
+  --color-accent-hover: #a5b4fc;      /* 强调色 hover */
+  --color-accent-light: #1e1b4b;      /* 选中态背景（映射到主色深色背景） */
+  --color-accent-dark: #a5b4fc;       /* 按钮 hover（映射到主色 hover） */
 
   /* 文字色 */
-  --color-text-primary: #F3F4F6;     /* 正文文字（加亮，提高可读性） */
-  --color-text-secondary: #D1D5DB;   /* 辅助说明、配置项标签（加亮） */
-  --color-text-muted: #6B7280;       /* 占位符、禁用态文字 */
+  --color-text-primary: #f1f5f9;      /* 正文文字（浅色） */
+  --color-text-secondary: #cbd5e1;    /* 辅助说明 */
+  --color-text-muted: #64748b;        /* 占位符、禁用态文字 */
 
   /* 边框色 */
-  --color-border: #2D2E42;           /* 分割线、输入框边框 */
-  --color-border-focus: #93C5FD;     /* 输入框聚焦边框 */
+  --color-border: #334155;            /* 分割线、输入框边框 */
+  --color-border-hover: #475569;      /* 边框 hover */
+  --color-border-focus: #818cf8;      /* 输入框聚焦边框（主色） */
 
-  /* 状态色（暗黑模式下保持一致） */
-  --color-success: #6EE7B7;
-  --color-warning: #FCD34D;
-  --color-error: #FCA5A5;
+  /* 语义色 - 成功 */
+  --color-success: #34d399;
+  --color-success-hover: #6ee7b7;
+  --color-success-light: #064e3b;
+
+  /* 语义色 - 警告 */
+  --color-warning: #fbbf24;
+  --color-warning-hover: #fcd34d;
+  --color-warning-light: #78350f;
+
+  /* 语义色 - 错误/危险 */
+  --color-error: #f87171;
+  --color-error-hover: #fca5a5;
+  --color-error-light: #7f1d1d;
 
   /* 提示面板 */
-  --color-hint-bg: #252640;          /* Hint_Panel 背景 */
-  --color-hint-text: #93C5FD;        /* Hint_Panel 联想文字 */
+  --color-hint-bg: #1e1b4b;           /* Hint_Panel 背景 */
+  --color-hint-text: #818cf8;         /* Hint_Panel 联想文字 */
 
-  /* 阴影（暗黑模式下加深） */
+  /* 阴影（深色模式下加深） */
   --shadow-base: rgba(0, 0, 0, 0.2);
+  --shadow-hover: rgba(0, 0, 0, 0.3);
 }

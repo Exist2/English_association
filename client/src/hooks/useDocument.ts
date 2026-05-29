@@ -54,6 +54,8 @@ export interface UseDocumentReturn {
   clearLoadError: () => void;
   /** 更新本地列表中某个文档的标题（不发起网络请求） */
   updateLocalTitle: (docId: string, newTitle: string) => void;
+  /** 刷新文档列表（重新从服务器获取） */
+  refresh: () => void;
 }
 
 /** 每页加载的文档数量 */
@@ -246,6 +248,16 @@ export function useDocument(): UseDocumentReturn {
     );
   }, []);
 
+  /**
+   * 刷新文档列表
+   * 重新从服务器获取第一页数据，用于外部创建文档后同步列表
+   */
+  const refresh = useCallback(() => {
+    setPage(1);
+    setHasMore(true);
+    fetchDocuments(1, searchKeyword, false);
+  }, [searchKeyword, fetchDocuments]);
+
   return {
     documents,
     isLoading,
@@ -258,5 +270,6 @@ export function useDocument(): UseDocumentReturn {
     loadError,
     clearLoadError,
     updateLocalTitle,
+    refresh,
   };
 }

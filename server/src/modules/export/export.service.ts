@@ -149,15 +149,7 @@ export class ExportService {
       sections: [
         {
           children: [
-            // 文档标题作为第一个段落（H1 级别）
-            new Paragraph({
-              text: document.title,
-              heading: HeadingLevel.HEADING_1,
-              alignment: AlignmentType.CENTER,
-            }),
-            // 标题后添加一个空行作为间隔
-            new Paragraph({ text: '' }),
-            // 正文内容段落
+            // 正文内容段落（不包含文档标题，标题仅用于文件命名）
             ...contentParagraphs,
           ],
         },
@@ -208,12 +200,7 @@ export class ExportService {
         });
         doc.on('error', (err: Error) => reject(err));
 
-        // 步骤3：添加文档标题（居中、大字号）
-        doc.fontSize(24).text(document.title, { align: 'center' });
-        // 标题后添加空行
-        doc.moveDown(1.5);
-
-        // 步骤4：解析内容并渲染到 PDF
+        // 渲染正文内容（不包含文档标题，标题仅用于文件命名）
         this.renderContentToPdf(doc, document.content);
 
         // 步骤5：结束文档（触发 'end' 事件）
@@ -369,7 +356,8 @@ export class ExportService {
    */
   private createDocxParagraph(node: TiptapNode): Paragraph {
     const textRuns = this.extractTextRuns(node.content || []);
-    return new Paragraph({ children: textRuns });
+    const alignment = this.getDocxAlignment(node.attrs?.textAlign as string);
+    return new Paragraph({ children: textRuns, alignment });
   }
 
   /**
@@ -391,9 +379,11 @@ export class ExportService {
     };
 
     const textRuns = this.extractTextRuns(node.content || []);
+    const alignment = this.getDocxAlignment(node.attrs?.textAlign as string);
     return new Paragraph({
       children: textRuns,
       heading: headingLevelMap[level] || HeadingLevel.HEADING_1,
+      alignment,
     });
   }
 
@@ -535,6 +525,7 @@ export class ExportService {
     node: TiptapNode,
   ): void {
     const textParts = this.extractTextParts(node.content || []);
+    const align = this.getPdfAlignment(node.attrs?.textAlign as string);
 
     if (textParts.length === 0) {
       // 空段落：添加一个空行
@@ -553,7 +544,7 @@ export class ExportService {
       // continued: true 表示后续文本在同一行继续
       // 最后一个片段不设置 continued，让 PDFKit 自动换行
       const isLast = i === textParts.length - 1;
-      doc.text(part.text, { continued: !isLast });
+      doc.text(part.text, { continued: !isLast, align });
     }
 
     doc.moveDown(0.3);
@@ -570,6 +561,7 @@ export class ExportService {
     node: TiptapNode,
   ): void {
     const level = (node.attrs?.level as number) || 1;
+    const align = this.getPdfAlignment(node.attrs?.textAlign as string);
 
     // 根据标题级别设置字号（级别越高字号越大）
     const fontSizeMap: Record<number, number> = {
@@ -583,7 +575,7 @@ export class ExportService {
     // 提取标题文本
     const text = this.extractPlainText(node.content || []);
 
-    doc.fontSize(fontSize).font('Helvetica-Bold').text(text);
+    doc.fontSize(fontSize).font('Helvetica-Bold').text(text, { align });
     doc.moveDown(0.5);
   }
 
@@ -673,6 +665,50 @@ export class ExportService {
     if (bold) return 'Helvetica-Bold';
     if (italic) return 'Helvetica-Oblique';
     return 'Helvetica';
+  }
+
+  /**
+   * 将 Tiptap 的 textAlign 属性映射为 docx 的 AlignmentType
+   *
+   * Tiptap TextAlign 扩展在节点 attrs 中存储对齐方式：
+   * - 'left' | 'center' | 'right' | 'justify'
+   * - 未设置时为 undefined（默认左对齐）
+   *
+   * @param textAlign - Tiptap 的对齐值
+   * @returns docx AlignmentType 枚举值
+   */
+  private getDocxAlignment(textAlign: string | undefined): (typeof AlignmentType)[keyof typeof AlignmentType] | undefined {
+    switch (textAlign) {
+      case 'center':
+        return AlignmentType.CENTER;
+      case 'right':
+        return AlignmentType.RIGHT;
+      case 'justify':
+        return AlignmentType.JUSTIFIED;
+      case 'left':
+      default:
+        return undefined; // 默认左对齐，不需要显式设置
+    }
+  }
+
+  /**
+   * 将 Tiptap 的 textAlign 属性映射为 PDFKit 的 align 选项
+   *
+   * @param textAlign - Tiptap 的对齐值
+   * @returns PDFKit 的 align 字符串
+   */
+  private getPdfAlignment(textAlign: string | undefined): 'left' | 'center' | 'right' | 'justify' {
+    switch (textAlign) {
+      case 'center':
+        return 'center';
+      case 'right':
+        return 'right';
+      case 'justify':
+        return 'justify';
+      case 'left':
+      default:
+        return 'left';
+    }
   }
 
   /**

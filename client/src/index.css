@@ -40,21 +40,19 @@ button:disabled {
  * 主题切换过渡动画
  *
  * 需求 6.2 要求主题切换在 200ms 内完成。
- * 通过对所有元素设置颜色相关属性的 transition，确保背景色、文字色、边框色等
- * 在 .dark 类添加/移除时平滑过渡，而非突兀跳变。
+ * 
+ * 使用低优先级的 :where() 选择器设置颜色过渡，
+ * 这样组件上 Tailwind 的 transition-all（侧边栏 width、面板 opacity/transform）
+ * 能正常覆盖此规则，不会被全局 transition 简写属性冲掉。
  *
- * 为什么用 * 选择器？
- * 因为 CSS 变量的值变化不会自动触发 transition，但引用变量的属性（如 background-color）
- * 在变量值改变时会重新计算，此时如果该属性有 transition 就会产生动画效果。
- * 所以需要在所有可能使用主题变量的元素上声明 transition。
+ * :where() 的特异性为 0，任何类选择器都能覆盖它。
  */
-*,
-*::before,
-*::after {
-  transition: background-color 200ms ease-in-out,
-              color 200ms ease-in-out,
-              border-color 200ms ease-in-out,
-              box-shadow 200ms ease-in-out;
+:where(*),
+:where(*::before),
+:where(*::after) {
+  transition-property: background-color, color, border-color, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: linear;
 }
 
 /**
@@ -68,6 +66,21 @@ button:disabled {
   }
   to {
     transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/**
+ * Toast 通知入场动画（不使用 translateX，避免与居中方式冲突）
+ * 仅使用 translateY + opacity 实现从上方滑入效果
+ */
+@keyframes toastIn {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
     opacity: 1;
   }
 }
@@ -123,4 +136,38 @@ button:disabled {
   line-height: 1.6;
   margin-top: 0.4em;
   margin-bottom: 0.4em;
+}
+
+/**
+ * 编辑器内列表样式
+ *
+ * Tailwind CSS 的 preflight 会重置 ul/ol 的 list-style 和 padding，
+ * 导致列表在编辑器中没有项目符号/编号。这里显式恢复列表样式。
+ */
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+
+.ProseMirror li {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+}
+
+/* 嵌套列表使用不同的项目符号 */
+.ProseMirror ul ul {
+  list-style-type: circle;
+}
+
+.ProseMirror ul ul ul {
+  list-style-type: square;
 }

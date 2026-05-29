@@ -6,6 +6,7 @@
  * 2. 标题长度验证（1-50 字符）
  * 3. 验证失败显示错误提示并阻止创建
  * 4. 支持 Enter 键快速确认、Escape 键取消
+ * 5. 打开/关闭时有 200ms 过渡动画（遮罩淡入淡出 + 内容缩放）
  *
  * 使用方式：
  * <CreateDocDialog open={isOpen} onClose={handleClose} onCreate={handleCreate} />
@@ -27,6 +28,11 @@ export interface CreateDocDialogProps {
 
 /**
  * CreateDocDialog - 新建文档对话框
+ *
+ * 动画实现：
+ * - 始终渲染 DOM，通过 opacity + scale + pointer-events 控制显隐
+ * - 打开时：遮罩淡入 + 内容从 scale(0.95) 放大到 scale(1)
+ * - 关闭时：反向动画，200ms 后通过 pointer-events-none 禁止交互
  *
  * 验证规则：
  * - 标题不能为空（去除首尾空格后）
@@ -91,19 +97,32 @@ export function CreateDocDialog({ open, onClose, onCreate }: CreateDocDialogProp
     [handleSubmit, onClose],
   );
 
-  if (!open) return null;
-
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className={`
+        fixed inset-0 z-50 flex items-center justify-center
+        ${open ? 'pointer-events-auto' : 'pointer-events-none'}
+      `}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-doc-title"
+      aria-hidden={!open}
     >
-      {/* 对话框内容区域，阻止点击冒泡 */}
+      {/* 遮罩层 */}
       <div
-        className="w-full max-w-md mx-4 p-6 rounded-xl bg-[var(--color-bg)] shadow-lg"
+        className={`absolute inset-0 bg-black/40 ${open ? 'opacity-100' : 'opacity-0'}`}
+        style={{ transition: 'opacity 200ms linear' }}
+      />
+
+      {/* 对话框内容区域 */}
+      <div
+        className={`
+          relative w-full max-w-md mx-4 p-6 rounded-xl bg-[var(--color-bg)] shadow-lg
+          origin-center
+          ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
+        `}
+        style={{ transition: 'opacity 200ms linear, transform 200ms linear' }}
         onClick={(e) => e.stopPropagation()}
       >
         <h2

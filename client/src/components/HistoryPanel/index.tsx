@@ -45,6 +45,8 @@ export interface HistoryPanelProps {
   onListEmpty?: () => void;
   /** 外部更新的文档标题（id + 新标题），变化时同步到列表 */
   updatedDocTitle?: { id: string; title: string } | null;
+  /** 外部新建的文档信号（变化时触发列表刷新） */
+  refreshSignal?: number;
 }
 
 /**
@@ -114,6 +116,7 @@ export function HistoryPanel({
   currentDocId,
   onListEmpty,
   updatedDocTitle,
+  refreshSignal,
 }: HistoryPanelProps) {
   /** 搜索输入框的值 */
   const [searchInput, setSearchInput] = useState('');
@@ -121,6 +124,10 @@ export function HistoryPanel({
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   /** 是否正在执行删除操作 */
   const [isDeleting, setIsDeleting] = useState(false);
+  /** 删除对话框是否可见（用于过渡动画） */
+  const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
+  /** 删除成功 Toast 消息 */
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState('');
 
   /**
    * 使用 useDebounce 对搜索输入进行防抖处理
@@ -143,6 +150,7 @@ export function HistoryPanel({
     loadError,
     clearLoadError,
     updateLocalTitle,
+    refresh,
   } = useDocument();
 
   /**
@@ -168,6 +176,17 @@ export function HistoryPanel({
       updateLocalTitle(updatedDocTitle.id, updatedDocTitle.title);
     }
   }, [updatedDocTitle, updateLocalTitle]);
+
+  /**
+   * 当 refreshSignal 变化时，刷新文档列表
+   * 用于新建文档后同步列表显示
+   */
+  useEffect(() => {
+    if (refreshSignal && refreshSignal > 0) {
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal]);
 
   /**
    * 滚动事件处理
@@ -211,27 +230,51 @@ export function HistoryPanel({
     (e: React.MouseEvent, docId: string, docTitle: string) => {
       e.stopPropagation();
       setDeleteTarget({ id: docId, title: docTitle });
+      setIsDeleteDialogVisible(true);
     },
     [],
   );
 
   /**
    * 确认删除文档
+   * 删除成功后自动选中下一篇文档：
+   * - 如果有下一篇（列表中被删项的后一项），选中它
+   * - 如果没有下一篇（被删的是最后一项），选中第一篇
+   * - 如果删除后列表为空，触发空状态
    */
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
 
     setIsDeleting(true);
     try {
-      await deleteDocument(deleteTarget.id);
-      onDocumentDelete(deleteTarget.id);
-      setDeleteTarget(null);
+      // 删除前计算下一篇文档
+      const deleteIndex = documents.findIndex((doc) => doc.id === deleteTarget.id);
+      const remainingDocs = documents.filter((doc) => doc.id !== deleteTarget.id);
 
-      // 删除后检查列表是否为空（documents 此时还未更新，需要减 1 判断）
-      // deleteDocument 内部会 setDocuments(prev => prev.filter(...))，
-      // 但由于 React 批量更新，这里 documents 还是旧值
-      if (documents.length <= 1 && onListEmpty) {
-        onListEmpty();
+      await deleteDocument(deleteTarget.id);
+
+      // 关闭对话框（带动画）
+      setIsDeleteDialogVisible(false);
+      setTimeout(() => setDeleteTarget(null), 200);
+
+      // 显示删除成功 Toast
+      setDeleteSuccessMsg('文档已删除');
+      setTimeout(() => setDeleteSuccessMsg(''), 3000);
+
+      // 删除后选中逻辑
+      if (remainingDocs.length === 0) {
+        // 列表为空，通知 EditorPage 清空并显示空白页
+        onDocumentDelete(deleteTarget.id);
+        if (onListEmpty) onListEmpty();
+      } else {
+        // 选中下一篇：优先选被删项后面的，没有则选第一篇
+        const nextDoc = deleteIndex < remainingDocs.length
+          ? remainingDocs[deleteIndex]
+          : remainingDocs[0];
+        // 先通知删除（清空当前文档状态）
+        onDocumentDelete(deleteTarget.id);
+        // 再选中下一篇
+        onDocumentSelect(nextDoc.id);
       }
     } catch {
       // 删除失败，保持对话框打开让用户重试
@@ -239,13 +282,14 @@ export function HistoryPanel({
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteTarget, deleteDocument, onDocumentDelete, documents.length, onListEmpty]);
+  }, [deleteTarget, deleteDocument, onDocumentDelete, onDocumentSelect, documents, onListEmpty]);
 
   /**
    * 取消删除
    */
   const handleCancelDelete = useCallback(() => {
-    setDeleteTarget(null);
+    setIsDeleteDialogVisible(false);
+    setTimeout(() => setDeleteTarget(null), 200);
   }, []);
 
   return (
@@ -254,12 +298,13 @@ export function HistoryPanel({
       <aside
         className={`
           fixed top-0 left-0 h-full z-40
+          w-[260px]
           bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)]
-          transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)]
           flex flex-col overflow-hidden
           lg:relative
-          ${isCollapsed ? 'w-0' : 'w-[260px]'}
+          ${isCollapsed ? '-translate-x-full lg:ml-[-260px]' : 'translate-x-0 lg:ml-0'}
         `}
+        style={{ transition: 'transform 200ms linear, margin-left 200ms linear' }}
         aria-label="历史记录面板"
       >
         {/* ----- 面板头部 ----- */}
@@ -427,17 +472,28 @@ export function HistoryPanel({
         </div>
       )}
 
-      {/* ===== 删除确认对话框 ===== */}
+      {/* ===== 删除确认对话框（始终渲染，通过 CSS 过渡控制显隐） ===== */}
       {deleteTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className={`fixed inset-0 z-50 flex items-center justify-center ${isDeleteDialogVisible ? 'pointer-events-auto' : 'pointer-events-none'}`}
           onClick={handleCancelDelete}
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-confirm-title"
         >
+          {/* 遮罩层 */}
           <div
-            className="w-full max-w-sm mx-4 p-6 rounded-xl bg-[var(--color-bg)] shadow-lg"
+            className={`absolute inset-0 bg-black/40 ${isDeleteDialogVisible ? 'opacity-100' : 'opacity-0'}`}
+            style={{ transition: 'opacity 200ms linear' }}
+          />
+          {/* 对话框内容 */}
+          <div
+            className={`
+              relative w-full max-w-sm mx-4 p-6 rounded-xl bg-[var(--color-bg)] shadow-lg
+              origin-center
+              ${isDeleteDialogVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
+            `}
+            style={{ transition: 'opacity 200ms linear, transform 200ms linear' }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3
@@ -474,6 +530,36 @@ export function HistoryPanel({
               >
                 {isDeleting ? '删除中...' : '确定删除'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== 删除成功 Toast ===== */}
+      {deleteSuccessMsg && (
+        <div
+          className="
+            fixed top-4 left-0 right-0 z-50
+            flex justify-center pointer-events-none
+          "
+          role="status"
+        >
+          <div
+            className="
+              px-4 py-2.5 rounded-lg
+              bg-[var(--color-success)] text-white text-sm font-medium
+              shadow-lg pointer-events-auto
+            "
+            style={{
+              animation: 'toastIn 300ms linear forwards',
+            }}
+          >
+            <div className="flex items-center gap-2">
+              {/* 对勾图标 */}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>{deleteSuccessMsg}</span>
             </div>
           </div>
         </div>

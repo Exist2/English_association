@@ -78,6 +78,9 @@ function EditorPage() {
   /** 最近一次标题更新（传递给 HistoryPanel 同步列表显示） */
   const [lastTitleUpdate, setLastTitleUpdate] = useState<{ id: string; title: string } | null>(null);
 
+  /** 列表刷新信号（递增触发 HistoryPanel 重新获取列表） */
+  const [refreshSignal, setRefreshSignal] = useState(0);
+
   /**
    * useRef 保存主题面板容器的 DOM 引用
    * 用于点击外部关闭面板
@@ -266,6 +269,8 @@ function EditorPage() {
         setLastTypedText('');
         // 标记已有文档，退出空状态
         setHasDocuments(true);
+        // 触发历史列表刷新，让新文档出现在列表中
+        setRefreshSignal((prev) => prev + 1);
       }
     } catch {
       // 创建失败，静默处理（可以后续添加 Toast 提示）
@@ -448,6 +453,7 @@ function EditorPage() {
         currentDocId={currentDocId}
         onListEmpty={() => setHasDocuments(false)}
         updatedDocTitle={lastTitleUpdate}
+        refreshSignal={refreshSignal}
       />
 
       {/* ===== 右侧：主内容区域 =====
@@ -593,20 +599,24 @@ function EditorPage() {
                 </svg>
               </button>
 
-              {/* 主题设置面板（下拉浮层） */}
-              {isThemePanelOpen && (
-                <div className="
+              {/* 主题设置面板（下拉浮层，始终渲染，通过 opacity + scale 实现 0.2s 过渡动画） */}
+              <div
+                className={`
                   absolute right-0 top-full mt-2 z-50
-                  w-72
-                  animate-[fadeIn_200ms_ease-out]
-                ">
-                  <ThemePanel
-                    currentTheme={theme}
-                    onThemeChange={handleThemeChange}
-                    onLogout={logout}
-                  />
-                </div>
-              )}
+                  w-72 origin-top-right
+                  ${isThemePanelOpen
+                    ? 'opacity-100 scale-100 pointer-events-auto'
+                    : 'opacity-0 scale-95 pointer-events-none'
+                  }
+                `}
+                style={{ transition: 'opacity 200ms linear, transform 200ms linear' }}
+              >
+                <ThemePanel
+                  currentTheme={theme}
+                  onThemeChange={handleThemeChange}
+                  onLogout={logout}
+                />
+              </div>
             </div>
 
             {/* 导出按钮 */}
