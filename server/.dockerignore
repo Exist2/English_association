@@ -1,0 +1,9 @@
+node_modules
+src
+test
+.env
+.env.production
+.env.example
+*.spec.ts
+tsconfig*.json
+nest-cli.json

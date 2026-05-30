@@ -1,0 +1,35 @@
+# docker-compose.yml
+# 仅管理后端 API 容器，MySQL/Redis/Nginx 使用服务器已有的服务
+#
+# 使用方式：
+#   1. 本地构建后端：cd server && npm run build
+#   2. 上传 server/dist、server/package.json、server/package-lock.json、server/Dockerfile、docker-compose.yml 到服务器
+#   3. 在服务器上执行：docker compose up -d --build
+#
+# 注意事项：
+#   - DB_HOST 和 REDIS_HOST 使用 host.docker.internal 访问宿主机已有的 MySQL/Redis
+#   - 需要确保 MySQL 允许来自 Docker 网段（172.17.x.x）的连接
+#   - .env.production 文件需要提前放在 server/ 目录下
+
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ea-api
+    restart: always
+    ports:
+      - "3003:3004"
+    env_file:
+      - ./server/.env.production
+    extra_hosts:
+      # 让容器内可以通过 host.docker.internal 访问宿主机的 MySQL 和 Redis
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3004/api"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

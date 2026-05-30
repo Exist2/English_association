@@ -1,4 +1,4 @@
- /**
+/**
  * Vite 构建配置文件
  *
  * 配置内容：
@@ -7,30 +7,30 @@
  * 3. 开发服务器代理 - 将 /api 请求转发到后端服务（避免跨域问题）
  */
 
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import { defineConfig, loadEnv } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(), // Tailwind CSS v4 Vite 插件
-  ],
-  server: {
-    /**
-     * 开发服务器代理配置
-     *
-     * 将前端发出的 /api 开头的请求转发到后端服务器（http://localhost:3000）
-     * 这样前端开发时不会遇到跨域（CORS）问题
-     *
-     * 例如：前端请求 /api/documents → 实际转发到 http://localhost:3000/api/documents
-     */
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3000', // 后端服务地址
-        changeOrigin: true,              // 修改请求头中的 Origin 字段
+// 将 defineConfig 的参数改为一个函数，解构出 mode
+export default defineConfig(({ mode }) => {
+  // 1. 加载环境变量
+  // 因为你的变量名是 VITE_API_URL（带有 VITE_ 前缀），所以直接传两个参数即可
+  const env = loadEnv(mode, process.cwd());
+
+  // 2. 返回 Vite 配置对象
+  return {
+    plugins: [
+      react(),
+      tailwindcss(), // Tailwind CSS v4 Vite 插件
+    ],
+    server: {
+      proxy: {
+        "/api": {
+          // 3. 在这里使用读取到的环境变量
+          target: env.VITE_API_URL,
+          changeOrigin: true,
+        },
       },
     },
-  },
-})
+  };
+});
