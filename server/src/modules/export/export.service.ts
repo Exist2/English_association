@@ -32,6 +32,8 @@ import {
   AlignmentType,
 } from 'docx';
 import PDFDocument from 'pdfkit';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DocumentService } from '../document/document.service';
 
 /**
@@ -59,6 +61,34 @@ interface TiptapNode {
   /** 节点属性（如标题级别 level） */
   attrs?: Record<string, unknown>;
 }
+
+type PdfFontSet = {
+  regular?: string;
+  bold?: string;
+  italic?: string;
+  boldItalic?: string;
+};
+
+/** PDFKit 文档中文本选项的扩展类型：在官方 TextOptions 基础上补充运行时支持但类型未声明的字段 */
+type TextOptionsEx = PDFKit.Mixins.TextOptions & {
+  oblique?: boolean;
+  underline?: boolean;
+};
+
+function mergeTextOptions(
+  base: PDFKit.Mixins.TextOptions,
+  extra: { oblique?: boolean; underline?: boolean },
+): TextOptionsEx {
+  return { ...base, ...(extra as Record<string, unknown>) } as TextOptionsEx;
+}
+
+/** 导出 PDF 注册到 PDFKit 的字体名（必须在 doc.font 中使用这些名称） */
+const EA_PDF_FONT = {
+  regular: 'EA_Regular',
+  bold: 'EA_Bold',
+  italic: 'EA_Italic',
+  boldItalic: 'EA_BoldItalic',
+} as const;
 
 /** 导出操作的超时时间（毫秒）：30秒 */
 const EXPORT_TIMEOUT_MS = 30000;
@@ -107,8 +137,14 @@ export class ExportService {
     // 步骤3：根据格式选择导出方法
     const exportPromise =
       format === 'docx'
-        ? this.exportToDocx({ title: document.title, content: document.content })
-        : this.exportToPdf({ title: document.title, content: document.content });
+        ? this.exportToDocx({
+            title: document.title,
+            content: document.content,
+          })
+        : this.exportToPdf({
+            title: document.title,
+            content: document.content,
+          });
 
     // 步骤4：使用 Promise.race 实现超时控制
     // Promise.race 会返回最先完成的 Promise 的结果
@@ -188,6 +224,8 @@ export class ExportService {
           size: 'A4',
           margins: { top: 72, bottom: 72, left: 72, right: 72 },
         });
+
+        this.attachPdfFonts(doc);
 
         // 步骤2：收集 PDF 数据块
         // PDFKit 使用 Node.js Stream API，数据以 chunk 形式输出
@@ -299,7 +337,7 @@ export class ExportService {
       const parsed = JSON.parse(content) as TiptapNode;
 
       // Tiptap 文档结构：{ type: 'doc', content: [...] }
-      const nodes = parsed.type === 'doc' ? (parsed.content || []) : [parsed];
+      const nodes = parsed.type === 'doc' ? parsed.content || [] : [parsed];
 
       for (const node of nodes) {
         const nodeParagraphs = this.convertNodeToDocxParagraphs(node);
@@ -371,7 +409,10 @@ export class ExportService {
     const level = (node.attrs?.level as number) || 1;
 
     // 将 Tiptap 的 level 映射为 docx 的 HeadingLevel
-    const headingLevelMap: Record<number, (typeof HeadingLevel)[keyof typeof HeadingLevel]> = {
+    const headingLevelMap: Record<
+      number,
+      (typeof HeadingLevel)[keyof typeof HeadingLevel]
+    > = {
       1: HeadingLevel.HEADING_1,
       2: HeadingLevel.HEADING_2,
       3: HeadingLevel.HEADING_3,
@@ -409,15 +450,11 @@ export class ExportService {
 
           // 为列表项添加前缀标记
           // 无序列表用 "• "，有序列表用 "1. "、"2. " 等
-          const prefix =
-            node.type === 'bulletList' ? '• ' : `${i + 1}. `;
+          const prefix = node.type === 'bulletList' ? '• ' : `${i + 1}. `;
 
           paragraphs.push(
             new Paragraph({
-              children: [
-                new TextRun({ text: prefix }),
-                ...textRuns,
-              ],
+              children: [new TextRun({ text: prefix }), ...textRuns],
             }),
           );
         }
@@ -469,7 +506,7 @@ export class ExportService {
   private renderContentToPdf(doc: PDFKit.PDFDocument, content: string): void {
     try {
       const parsed = JSON.parse(content) as TiptapNode;
-      const nodes = parsed.type === 'doc' ? (parsed.content || []) : [parsed];
+      const nodes = parsed.type === 'doc' ? parsed.content || [] : [parsed];
 
       for (const node of nodes) {
         this.renderNodeToPdf(doc, node);
@@ -533,18 +570,26 @@ export class ExportService {
       return;
     }
 
+    const hasCustomFont = this.hasCustomFont(doc);
+
     // 渲染段落中的每个文本片段
     doc.fontSize(12);
     for (let i = 0; i < textParts.length; i++) {
       const part = textParts[i];
-      // 根据格式标记设置字体
-      const font = this.getPdfFont(part.bold, part.italic);
+      const font = this.getPdfFont(doc, part.bold, part.italic);
       doc.font(font);
 
-      // continued: true 表示后续文本在同一行继续
-      // 最后一个片段不设置 continued，让 PDFKit 自动换行
+      const useOblique = hasCustomFont && part.italic;
       const isLast = i === textParts.length - 1;
-      doc.text(part.text, { continued: !isLast, align });
+
+      // PDFKit 没有内置“合成斜体”，但支持 { oblique: true } 对任意字体做倾斜模拟；
+      // 对中文等没有真正斜体字形的字体效果很自然；下划线用 { underline: true, underlineColor }。
+      doc.text(part.text, {
+        continued: !isLast,
+        align,
+        oblique: useOblique,
+        underline: part.underline,
+      });
     }
 
     doc.moveDown(0.3);
@@ -556,10 +601,7 @@ export class ExportService {
    * @param doc - PDFKit 文档实例
    * @param node - heading 类型节点
    */
-  private renderHeadingToPdf(
-    doc: PDFKit.PDFDocument,
-    node: TiptapNode,
-  ): void {
+  private renderHeadingToPdf(doc: PDFKit.PDFDocument, node: TiptapNode): void {
     const level = (node.attrs?.level as number) || 1;
     const align = this.getPdfAlignment(node.attrs?.textAlign as string);
 
@@ -575,7 +617,10 @@ export class ExportService {
     // 提取标题文本
     const text = this.extractPlainText(node.content || []);
 
-    doc.fontSize(fontSize).font('Helvetica-Bold').text(text, { align });
+    doc
+      .fontSize(fontSize)
+      .font(this.getPdfFont(doc, true, false))
+      .text(text, { align });
     doc.moveDown(0.5);
   }
 
@@ -596,12 +641,14 @@ export class ExportService {
         if (itemNode.type === 'paragraph') {
           const text = this.extractPlainText(itemNode.content || []);
           // 无序列表用 "• "，有序列表用 "1. " 等
-          const prefix =
-            node.type === 'bulletList' ? '• ' : `${i + 1}. `;
+          const prefix = node.type === 'bulletList' ? '• ' : `${i + 1}. `;
 
-          doc.fontSize(12).font('Helvetica').text(`${prefix}${text}`, {
-            indent: 20,
-          });
+          doc
+            .fontSize(12)
+            .font(this.getPdfFont(doc, false, false))
+            .text(`${prefix}${text}`, {
+              indent: 20,
+            });
         }
       }
     }
@@ -615,10 +662,18 @@ export class ExportService {
    * @param nodes - Tiptap 内容节点数组
    * @returns 带格式信息的文本片段数组
    */
-  private extractTextParts(
-    nodes: TiptapNode[],
-  ): Array<{ text: string; bold: boolean; italic: boolean }> {
-    const parts: Array<{ text: string; bold: boolean; italic: boolean }> = [];
+  private extractTextParts(nodes: TiptapNode[]): Array<{
+    text: string;
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+  }> {
+    const parts: Array<{
+      text: string;
+      bold: boolean;
+      italic: boolean;
+      underline: boolean;
+    }> = [];
 
     for (const node of nodes) {
       if (node.type === 'text' && node.text) {
@@ -627,6 +682,7 @@ export class ExportService {
           text: node.text,
           bold: marks.some((m) => m.type === 'bold'),
           italic: marks.some((m) => m.type === 'italic'),
+          underline: marks.some((m) => m.type === 'underline'),
         });
       }
     }
@@ -660,11 +716,150 @@ export class ExportService {
    * @param italic - 是否斜体
    * @returns PDFKit 字体名称
    */
-  private getPdfFont(bold: boolean, italic: boolean): string {
-    if (bold && italic) return 'Helvetica-BoldOblique';
-    if (bold) return 'Helvetica-Bold';
-    if (italic) return 'Helvetica-Oblique';
-    return 'Helvetica';
+  private attachPdfFonts(doc: PDFKit.PDFDocument): void {
+    const fonts = this.resolvePdfFonts();
+
+    const registered: {
+      regular?: string;
+      bold?: string;
+      italic?: string;
+      boldItalic?: string;
+    } = {};
+
+    if (fonts.regular) {
+      try {
+        doc.registerFont(EA_PDF_FONT.regular, fonts.regular);
+        registered.regular = EA_PDF_FONT.regular;
+      } catch (err) {
+        console.warn(
+          `[PDF] 注册 regular 字体失败: ${fonts.regular}`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    if (fonts.bold) {
+      try {
+        doc.registerFont(EA_PDF_FONT.bold, fonts.bold);
+        registered.bold = EA_PDF_FONT.bold;
+      } catch (err) {
+        console.warn(
+          `[PDF] 注册 bold 字体失败: ${fonts.bold}`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    if (fonts.italic) {
+      try {
+        doc.registerFont(EA_PDF_FONT.italic, fonts.italic);
+        registered.italic = EA_PDF_FONT.italic;
+      } catch (err) {
+        console.warn(
+          `[PDF] 注册 italic 字体失败: ${fonts.italic}`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    if (fonts.boldItalic) {
+      try {
+        doc.registerFont(EA_PDF_FONT.boldItalic, fonts.boldItalic);
+        registered.boldItalic = EA_PDF_FONT.boldItalic;
+      } catch (err) {
+        console.warn(
+          `[PDF] 注册 boldItalic 字体失败: ${fonts.boldItalic}`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    (doc as unknown as { __eaPdfFonts?: typeof registered }).__eaPdfFonts =
+      registered;
+
+    if (registered.regular) {
+      doc.font(registered.regular);
+    } else {
+      console.warn(
+        '[PDF] 未找到可用的中文字体文件，PDF 中文可能会出现乱码。请将字体放入 server/fonts/ 目录。',
+      );
+    }
+  }
+
+  private resolveExistingPath(
+    filePath: string | undefined,
+  ): string | undefined {
+    if (!filePath) return undefined;
+    const resolved = path.isAbsolute(filePath)
+      ? filePath
+      : path.resolve(process.cwd(), filePath);
+    return fs.existsSync(resolved) ? resolved : undefined;
+  }
+
+  private firstExistingPath(candidates: string[]): string | undefined {
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return undefined;
+  }
+
+  private resolvePdfFonts(): PdfFontSet {
+    const envRegular =
+      this.resolveExistingPath(process.env.PDF_FONT_REGULAR) ||
+      this.resolveExistingPath(process.env.PDF_FONT_PATH);
+    const envBold = this.resolveExistingPath(process.env.PDF_FONT_BOLD);
+    const envItalic = this.resolveExistingPath(process.env.PDF_FONT_ITALIC);
+    const envBoldItalic = this.resolveExistingPath(
+      process.env.PDF_FONT_BOLD_ITALIC,
+    );
+
+    const projectFontsDir = path.resolve(process.cwd(), 'fonts');
+    const projectRegular = this.firstExistingPath([
+      path.join(projectFontsDir, 'NotoSansCJKsc-Regular.otf'),
+    ]);
+
+    const projectBold = this.firstExistingPath([
+      path.join(projectFontsDir, 'NotoSansCJKsc-Bold.otf'),
+    ]);
+
+    return {
+      regular: projectRegular || envRegular,
+      bold: projectBold || envBold,
+      italic: envItalic,
+      boldItalic: envBoldItalic,
+    };
+  }
+
+  private getPdfFont(
+    doc: PDFKit.PDFDocument,
+    bold: boolean,
+    italic: boolean,
+  ): string {
+    const fonts = (doc as unknown as { __eaPdfFonts?: PdfFontSet })
+      .__eaPdfFonts;
+
+    if (bold && italic) {
+      return (
+        fonts?.boldItalic ||
+        fonts?.bold ||
+        fonts?.italic ||
+        fonts?.regular ||
+        'Helvetica-BoldOblique'
+      );
+    }
+    if (bold) {
+      return fonts?.bold || fonts?.regular || 'Helvetica-Bold';
+    }
+    if (italic) {
+      return fonts?.italic || fonts?.regular || 'Helvetica-Oblique';
+    }
+    return fonts?.regular || 'Helvetica';
+  }
+
+  private hasCustomFont(doc: PDFKit.PDFDocument): boolean {
+    const fonts = (doc as unknown as { __eaPdfFonts?: PdfFontSet })
+      .__eaPdfFonts;
+    return !!(fonts && (fonts.regular || fonts.bold || fonts.italic));
   }
 
   /**
@@ -677,7 +872,9 @@ export class ExportService {
    * @param textAlign - Tiptap 的对齐值
    * @returns docx AlignmentType 枚举值
    */
-  private getDocxAlignment(textAlign: string | undefined): (typeof AlignmentType)[keyof typeof AlignmentType] | undefined {
+  private getDocxAlignment(
+    textAlign: string | undefined,
+  ): (typeof AlignmentType)[keyof typeof AlignmentType] | undefined {
     switch (textAlign) {
       case 'center':
         return AlignmentType.CENTER;
@@ -697,7 +894,9 @@ export class ExportService {
    * @param textAlign - Tiptap 的对齐值
    * @returns PDFKit 的 align 字符串
    */
-  private getPdfAlignment(textAlign: string | undefined): 'left' | 'center' | 'right' | 'justify' {
+  private getPdfAlignment(
+    textAlign: string | undefined,
+  ): 'left' | 'center' | 'right' | 'justify' {
     switch (textAlign) {
       case 'center':
         return 'center';
@@ -728,9 +927,7 @@ export class ExportService {
   private createTimeoutPromise(): Promise<never> {
     return new Promise<never>((_, reject) => {
       setTimeout(() => {
-        reject(
-          new GatewayTimeoutException('导出超时，请重试'),
-        );
+        reject(new GatewayTimeoutException('导出超时，请重试'));
       }, EXPORT_TIMEOUT_MS);
     });
   }

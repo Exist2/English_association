@@ -43,6 +43,13 @@ export class AssociationService {
   /** 使用的模型名称（如 qwen-turbo、qwen-plus） */
   private model: string;
 
+  /**
+   * 当前进行中的联想/翻译请求的 AbortController
+   * - processInput 入口会 abort 掉上一次未完成的请求
+   * - 与 8s 超时 abort 协同，保证过期请求不堆积
+   */
+  private currentController?: AbortController;
+
   constructor(private configService: ConfigService) {
     /**
      * 初始化 OpenAI 客户端
@@ -58,10 +65,55 @@ export class AssociationService {
         'QWEN_BASE_URL',
         'https://dashscope.aliyuncs.com/compatible-mode/v1',
       ),
+      // SDK 内置 timeout 作为“网络空闲超时”兑底；
+      // 真正的“总耗时 8s”由我们手动的 AbortController 控制（见 requestWithTimeout）。
       timeout: AI_TIMEOUT_MS,
     });
 
     this.model = this.configService.get<string>('QWEN_MODEL', 'qwen-turbo');
+  }
+
+  /**
+   * 使用 AbortController 为单次 AI 请求增加 8s 总耗时上限。
+   * - 超时或被 abort 时，OpenAI SDK 会拋出 AbortError
+   * - 超时/取消场景下统一返回空数组，实现“降级返回空结果”
+   */
+  private async requestWithTimeout<T>(
+    create: (signal: AbortSignal) => Promise<T>,
+    logTag: string,
+  ): Promise<T | null> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+    this.currentController = controller;
+    try {
+      return await create(controller.signal);
+    } catch (error) {
+      const isAbort = this.isAbortError(error);
+      if (isAbort) {
+        this.logger.warn(
+          `[${logTag}] 请求被取消/超时（${AI_TIMEOUT_MS}ms），降级返回空结果`,
+        );
+      } else {
+        this.logger.error(
+          `[${logTag}] 请求失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        );
+      }
+      return null;
+    } finally {
+      clearTimeout(timer);
+      if (this.currentController === controller) {
+        this.currentController = undefined;
+      }
+    }
+  }
+
+  private isAbortError(error: unknown): boolean {
+    if (!error) return false;
+    if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+      return error.name === 'AbortError';
+    }
+    const anyErr = error as { name?: string; code?: string };
+    return anyErr?.name === 'AbortError' || anyErr?.code === 'ABORT_ERR';
   }
 
   /**
@@ -127,34 +179,37 @@ export class AssociationService {
    * await getTranslation('你好') // [{ text: 'Hello', ... }, { text: 'Hi there', ... }]
    */
   async getTranslation(text: string): Promise<AssociationResult[]> {
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
+    const response = await this.requestWithTimeout(
+      (signal) =>
+        this.openai.chat.completions.create(
           {
-            role: 'system',
-            content: `你是一个英语翻译助手。用户输入中文，你需要提供最多5种不同的英文翻译。
+            model: this.model,
+            messages: [
+              {
+                role: 'system',
+                content: `你是一个英语翻译助手。用户输入中文，你需要提供最多5种不同的英文翻译。
 要求：
 1. 每行一个翻译，不要编号，不要解释
 2. 翻译要自然地道，覆盖不同表达方式（正式/口语/简洁等）
 3. 只输出英文翻译，不要输出其他内容
 4. 如果输入很短（1-2个字），也尽量给出不同语境下的翻译`,
+              },
+              {
+                role: 'user',
+                content: text,
+              },
+            ],
+            temperature: 0.8,
+            max_tokens: 200,
           },
-          {
-            role: 'user',
-            content: text,
-          },
-        ],
-        temperature: 0.8,
-        max_tokens: 200,
-      });
+          { signal },
+        ),
+      'Translation',
+    );
 
-      const content = response.choices[0]?.message?.content || '';
-      return this.parseResults(content, 'translation');
-    } catch (error) {
-      this.logger.error(`AI 翻译请求失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      return [];
-    }
+    if (!response) return [];
+    const content = response.choices[0]?.message?.content || '';
+    return this.parseResults(content, 'translation');
   }
 
   /**
@@ -170,35 +225,38 @@ export class AssociationService {
    * await getAssociation('import') // [{ text: 'important', ... }, { text: 'import duty', ... }]
    */
   async getAssociation(text: string): Promise<AssociationResult[]> {
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
+    const response = await this.requestWithTimeout(
+      (signal) =>
+        this.openai.chat.completions.create(
           {
-            role: 'system',
-            content: `你是一个英语写作助手。用户输入英文单词或短语，你需要提供最多5个相关的英文联想词汇或句子补全。
+            model: this.model,
+            messages: [
+              {
+                role: 'system',
+                content: `你是一个英语写作助手。用户输入英文单词或短语，你需要提供最多5个相关的英文联想词汇或句子补全。
 要求：
 1. 每行一个联想结果，不要编号，不要解释
 2. 可以是：单词补全、相关短语、包含该词的常用句子
 3. 结果要实用，帮助用户扩展写作思路
 4. 只输出英文，不要输出中文
 5. 优先给出与输入最相关的补全`,
+              },
+              {
+                role: 'user',
+                content: text,
+              },
+            ],
+            temperature: 0.9,
+            max_tokens: 300,
           },
-          {
-            role: 'user',
-            content: text,
-          },
-        ],
-        temperature: 0.9,
-        max_tokens: 300,
-      });
+          { signal },
+        ),
+      'Association',
+    );
 
-      const content = response.choices[0]?.message?.content || '';
-      return this.parseResults(content, 'association');
-    } catch (error) {
-      this.logger.error(`AI 联想请求失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      return [];
-    }
+    if (!response) return [];
+    const content = response.choices[0]?.message?.content || '';
+    return this.parseResults(content, 'association');
   }
 
   /**
@@ -218,6 +276,12 @@ export class AssociationService {
   async processInput(
     text: string,
   ): Promise<{ results: AssociationResult[]; detectedLanguage: string }> {
+    // 取消上一次未完成的请求，避免过期请求堆积
+    if (this.currentController) {
+      this.currentController.abort();
+      this.currentController = undefined;
+    }
+
     const detectedLanguage = this.detectLanguage(text);
 
     let results: AssociationResult[] = [];
