@@ -23,9 +23,9 @@
  * />
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { useDocument } from '../../hooks/useDocument';
-import { useDebounce } from '../../hooks/useDebounce';
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useDocument } from "../../hooks/useDocument";
+import { useDebounce } from "../../hooks/useDebounce";
 
 /**
  * HistoryPanel 组件 Props 接口
@@ -58,7 +58,7 @@ export interface HistoryPanelProps {
  */
 export function truncateTitle(title: string): string {
   if (title.length > 20) {
-    return title.slice(0, 20) + '...';
+    return title.slice(0, 20) + "...";
   }
   return title;
 }
@@ -71,7 +71,7 @@ export function truncateTitle(title: string): string {
  * @returns 中文相对时间（如 "刚刚"、"5分钟前"、"2小时前"、"昨天"、"3天前"）
  */
 export function formatRelativeTime(dateStr: string): string {
-  if (!dateStr) return '';
+  if (!dateStr) return "";
 
   const now = new Date();
   const date = new Date(dateStr);
@@ -85,18 +85,18 @@ export function formatRelativeTime(dateStr: string): string {
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffSeconds < 60) {
-    return '刚刚';
+    return "刚刚";
   } else if (diffMinutes < 60) {
     return `${diffMinutes}分钟前`;
   } else if (diffHours < 24) {
     return `${diffHours}小时前`;
   } else if (diffDays === 1) {
-    return '昨天';
+    return "昨天";
   } else if (diffDays < 30) {
     return `${diffDays}天前`;
   } else {
     // 超过 30 天显示具体日期
-    return date.toLocaleDateString('zh-CN');
+    return date.toLocaleDateString("zh-CN");
   }
 }
 
@@ -119,15 +119,18 @@ export function HistoryPanel({
   refreshSignal,
 }: HistoryPanelProps) {
   /** 搜索输入框的值 */
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState("");
   /** 要删除的文档信息（用于确认对话框） */
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   /** 是否正在执行删除操作 */
   const [isDeleting, setIsDeleting] = useState(false);
   /** 删除对话框是否可见（用于过渡动画） */
   const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
   /** 删除成功 Toast 消息 */
-  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState('');
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState("");
 
   /**
    * 使用 useDebounce 对搜索输入进行防抖处理
@@ -248,8 +251,12 @@ export function HistoryPanel({
     setIsDeleting(true);
     try {
       // 删除前计算下一篇文档
-      const deleteIndex = documents.findIndex((doc) => doc.id === deleteTarget.id);
-      const remainingDocs = documents.filter((doc) => doc.id !== deleteTarget.id);
+      const deleteIndex = documents.findIndex(
+        (doc) => doc.id === deleteTarget.id,
+      );
+      const remainingDocs = documents.filter(
+        (doc) => doc.id !== deleteTarget.id,
+      );
 
       await deleteDocument(deleteTarget.id);
 
@@ -258,8 +265,8 @@ export function HistoryPanel({
       setTimeout(() => setDeleteTarget(null), 200);
 
       // 显示删除成功 Toast
-      setDeleteSuccessMsg('文档已删除');
-      setTimeout(() => setDeleteSuccessMsg(''), 3000);
+      setDeleteSuccessMsg("文档已删除");
+      setTimeout(() => setDeleteSuccessMsg(""), 3000);
 
       // 删除后选中逻辑
       if (remainingDocs.length === 0) {
@@ -268,9 +275,10 @@ export function HistoryPanel({
         if (onListEmpty) onListEmpty();
       } else {
         // 选中下一篇：优先选被删项后面的，没有则选第一篇
-        const nextDoc = deleteIndex < remainingDocs.length
-          ? remainingDocs[deleteIndex]
-          : remainingDocs[0];
+        const nextDoc =
+          deleteIndex < remainingDocs.length
+            ? remainingDocs[deleteIndex]
+            : remainingDocs[0];
         // 先通知删除（清空当前文档状态）
         onDocumentDelete(deleteTarget.id);
         // 再选中下一篇
@@ -278,11 +286,18 @@ export function HistoryPanel({
       }
     } catch {
       // 删除失败，保持对话框打开让用户重试
-      console.error('删除文档失败');
+      console.error("删除文档失败");
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteTarget, deleteDocument, onDocumentDelete, onDocumentSelect, documents, onListEmpty]);
+  }, [
+    deleteTarget,
+    deleteDocument,
+    onDocumentDelete,
+    onDocumentSelect,
+    documents,
+    onListEmpty,
+  ]);
 
   /**
    * 取消删除
@@ -302,19 +317,21 @@ export function HistoryPanel({
           bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)]
           flex flex-col overflow-hidden
           lg:relative
-          ${isCollapsed ? '-translate-x-full lg:ml-[-260px]' : 'translate-x-0 lg:ml-0'}
+          ${isCollapsed ? "-translate-x-full lg:ml-[-260px]" : "translate-x-0 lg:ml-0"}
         `}
-        style={{ transition: 'transform 200ms linear, margin-left 200ms linear' }}
+        style={{
+          transition: "transform 200ms linear, margin-left 200ms linear",
+        }}
         aria-label="历史记录面板"
       >
         {/* ----- 面板头部 ----- */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] shrink-0">
-          <h2 className="text-lg font-medium text-[var(--color-text-primary)] whitespace-nowrap">
+        <div className="flex h-12 items-center justify-between px-4 border-b border-[var(--color-border)] shrink-0">
+          <h2 className="text-lg font-medium leading-none text-[var(--color-text-primary)] whitespace-nowrap">
             历史记录
           </h2>
           <button
             onClick={onToggleCollapse}
-            className="p-1.5 rounded-md hover:bg-[var(--color-accent-light)] transition-colors duration-100"
+            className="p-1.5 rounded-md hover:bg-[var(--color-bg-hover)] transition-colors duration-100"
             aria-label="折叠面板"
             title="折叠面板"
           >
@@ -325,7 +342,12 @@ export function HistoryPanel({
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
         </div>
@@ -359,21 +381,27 @@ export function HistoryPanel({
           {/* 加载中状态 */}
           {isLoading && documents.length === 0 && (
             <div className="flex items-center justify-center py-8">
-              <span className="text-sm text-[var(--color-text-secondary)]">加载中...</span>
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                加载中...
+              </span>
             </div>
           )}
 
           {/* 空状态：无文档 */}
           {!isLoading && documents.length === 0 && !searchKeyword && (
             <div className="flex items-center justify-center py-8">
-              <span className="text-sm text-[var(--color-text-muted)]">暂无文档</span>
+              <span className="text-sm text-[var(--color-text-muted)]">
+                暂无文档
+              </span>
             </div>
           )}
 
           {/* 搜索无结果状态 */}
           {!isLoading && documents.length === 0 && searchKeyword && (
             <div className="flex items-center justify-center py-8">
-              <span className="text-sm text-[var(--color-text-muted)]">未找到匹配的文档</span>
+              <span className="text-sm text-[var(--color-text-muted)]">
+                未找到匹配的文档
+              </span>
             </div>
           )}
 
@@ -387,15 +415,15 @@ export function HistoryPanel({
                 transition-colors duration-100
                 ${
                   currentDocId === doc.id
-                    ? 'bg-[var(--color-accent-light)] border-l-[3px] border-l-[var(--color-accent)]'
-                    : 'hover:bg-[var(--color-hint-bg)] border-l-[3px] border-l-transparent'
+                    ? "bg-[var(--color-accent-light)] border-l-[3px] border-l-[var(--color-accent)]"
+                    : "hover:bg-[var(--color-hint-bg)] border-l-[3px] border-l-transparent"
                 }
               `}
               role="button"
               tabIndex={0}
               aria-label={`打开文档: ${doc.title}`}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleDocumentClick(doc.id);
+                if (e.key === "Enter") handleDocumentClick(doc.id);
               }}
             >
               {/* 文档标题（CSS truncate 自动截断） */}
@@ -440,7 +468,9 @@ export function HistoryPanel({
           {/* 加载更多指示器 */}
           {hasMore && documents.length > 0 && (
             <div className="flex items-center justify-center py-4">
-              <span className="text-xs text-[var(--color-text-muted)]">滚动加载更多...</span>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                滚动加载更多...
+              </span>
             </div>
           )}
         </div>
@@ -464,8 +494,18 @@ export function HistoryPanel({
               className="ml-2 p-0.5 rounded hover:bg-white/20 transition-colors"
               aria-label="关闭错误提示"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -475,7 +515,7 @@ export function HistoryPanel({
       {/* ===== 删除确认对话框（始终渲染，通过 CSS 过渡控制显隐） ===== */}
       {deleteTarget && (
         <div
-          className={`fixed inset-0 z-50 flex items-center justify-center ${isDeleteDialogVisible ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          className={`fixed inset-0 z-50 flex items-center justify-center ${isDeleteDialogVisible ? "pointer-events-auto" : "pointer-events-none"}`}
           onClick={handleCancelDelete}
           role="dialog"
           aria-modal="true"
@@ -483,17 +523,19 @@ export function HistoryPanel({
         >
           {/* 遮罩层 */}
           <div
-            className={`absolute inset-0 bg-black/40 ${isDeleteDialogVisible ? 'opacity-100' : 'opacity-0'}`}
-            style={{ transition: 'opacity 200ms linear' }}
+            className={`absolute inset-0 bg-black/40 ${isDeleteDialogVisible ? "opacity-100" : "opacity-0"}`}
+            style={{ transition: "opacity 200ms linear" }}
           />
           {/* 对话框内容 */}
           <div
             className={`
               relative w-full max-w-sm mx-4 p-6 rounded-xl bg-[var(--color-bg)] shadow-lg
               origin-center
-              ${isDeleteDialogVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
+              ${isDeleteDialogVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"}
             `}
-            style={{ transition: 'opacity 200ms linear, transform 200ms linear' }}
+            style={{
+              transition: "opacity 200ms linear, transform 200ms linear",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3
@@ -503,7 +545,8 @@ export function HistoryPanel({
               确认删除
             </h3>
             <p className="text-sm text-[var(--color-text-secondary)] mb-5">
-              确定要删除文档 &ldquo;{truncateTitle(deleteTarget.title)}&rdquo; 吗？此操作不可恢复。
+              确定要删除文档 &ldquo;{truncateTitle(deleteTarget.title)}&rdquo;
+              吗？此操作不可恢复。
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -528,7 +571,7 @@ export function HistoryPanel({
                   transition-all duration-100
                 "
               >
-                {isDeleting ? '删除中...' : '确定删除'}
+                {isDeleting ? "删除中..." : "确定删除"}
               </button>
             </div>
           </div>
@@ -551,13 +594,23 @@ export function HistoryPanel({
               shadow-lg pointer-events-auto
             "
             style={{
-              animation: 'toastIn 300ms linear forwards',
+              animation: "toastIn 300ms linear forwards",
             }}
           >
             <div className="flex items-center gap-2">
               {/* 对勾图标 */}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
               <span>{deleteSuccessMsg}</span>
             </div>
@@ -565,32 +618,7 @@ export function HistoryPanel({
         </div>
       )}
 
-      {/* ===== 折叠状态下的展开按钮 ===== */}
-      {isCollapsed && (
-        <button
-          onClick={onToggleCollapse}
-          className="
-            fixed top-4 left-4 z-30
-            p-2 rounded-lg
-            bg-[var(--color-bg-secondary)] border border-[var(--color-border)]
-            hover:bg-[var(--color-accent-light)]
-            shadow-sm transition-colors duration-100
-            lg:absolute
-          "
-          aria-label="展开历史记录面板"
-          title="展开历史记录"
-        >
-          {/* 右箭头图标 + 文档图标 */}
-          <svg
-            className="w-5 h-5 text-[var(--color-text-secondary)]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      )}
+      {/* 折叠态的展开入口已移到 EditorPage 顶部保存状态左侧 */}
     </>
   );
 }

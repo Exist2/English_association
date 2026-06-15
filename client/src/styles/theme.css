@@ -18,6 +18,8 @@
   --color-bg-secondary: #ffffff;      /* 侧边栏、面板背景（纯白） */
   --color-bg-content: #f1f3f9;        /* 中间内容区背景（略深于主背景） */
   --color-bg-editor: #ffffff;         /* 编辑区域纯白背景 */
+  --color-bg-hover: #bad2ef;    /* hover颜色 */
+
 
   /* 主色（蓝紫色系列） */
   --color-primary: #6366f1;           /* 主色 - 按钮、链接、活跃状态 */
@@ -72,6 +74,7 @@
   --color-bg-secondary: #1e293b;      /* 侧边栏、面板背景 */
   --color-bg-content: #0c1322;        /* 中间内容区背景（略深于主背景） */
   --color-bg-editor: #1e293b;         /* 编辑区域背景 */
+  --color-bg-hover: #334155;          /* hover 背景色 */
 
   /* 主色 - 更亮的变体（深色背景上需要更亮的颜色） */
   --color-primary: #818cf8;           /* 主色 */

@@ -16,8 +16,8 @@
  * <ExportButton documentId={currentDocId} isContentEmpty={!hasContent} />
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { apiClient } from '../../services/api-client';
+import { useState, useRef, useEffect, useCallback } from "react";
+import { apiClient } from "../../services/api-client";
 
 // ==================== 类型定义 ====================
 
@@ -34,10 +34,10 @@ export interface ExportButtonProps {
 }
 
 /** 导出格式类型 */
-type ExportFormat = 'docx' | 'pdf';
+type ExportFormat = "docx" | "pdf";
 
 /** 导出状态类型 */
-type ExportStatus = 'idle' | 'exporting' | 'success' | 'error' | 'timeout';
+type ExportStatus = "idle" | "exporting" | "success" | "error" | "timeout";
 
 // ==================== 常量定义 ====================
 
@@ -55,20 +55,24 @@ const EXPORT_TIMEOUT_MS = 30000;
  * @param props - 包含 documentId 和 isContentEmpty
  * @returns JSX 元素
  */
-export function ExportButton({ documentId, isContentEmpty, documentTitle }: ExportButtonProps) {
+export function ExportButton({
+  documentId,
+  isContentEmpty,
+  documentTitle,
+}: ExportButtonProps) {
   // ==================== 状态管理 ====================
 
   /** 下拉菜单是否展开 */
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   /** 当前导出状态 */
-  const [exportStatus, setExportStatus] = useState<ExportStatus>('idle');
+  const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
 
   /** 错误信息（导出失败时显示） */
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
 
   /** 记录上次选择的格式，用于重试 */
-  const [lastFormat, setLastFormat] = useState<ExportFormat>('docx');
+  const [lastFormat, setLastFormat] = useState<ExportFormat>("docx");
 
   /**
    * AbortController 引用
@@ -92,19 +96,22 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
    */
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
     }
 
     // 只在菜单打开时监听
     if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
     // 清理函数：组件卸载或菜单关闭时移除监听
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isDropdownOpen]);
 
@@ -131,7 +138,7 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
   /**
    * 判断是否正在导出中
    */
-  const isExporting = exportStatus === 'exporting';
+  const isExporting = exportStatus === "exporting";
 
   /**
    * 从响应头中提取文件名
@@ -142,7 +149,10 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
    * @param format - 导出格式，用于生成默认文件名
    * @returns 文件名字符串
    */
-  function extractFilename(contentDisposition: string | null, format: ExportFormat): string {
+  function extractFilename(
+    contentDisposition: string | null,
+    format: ExportFormat,
+  ): string {
     // 优先使用文档标题作为文件名
     if (documentTitle && documentTitle.trim()) {
       return `${documentTitle.trim()}.${format}`;
@@ -154,10 +164,12 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
     if (!contentDisposition) return defaultName;
 
     // 尝试匹配 filename="xxx" 或 filename=xxx 格式
-    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+    const filenameMatch = contentDisposition.match(
+      /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
+    );
     if (filenameMatch && filenameMatch[1]) {
       // 去除引号
-      return filenameMatch[1].replace(/['"]/g, '');
+      return filenameMatch[1].replace(/['"]/g, "");
     }
 
     return defaultName;
@@ -179,7 +191,7 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
     const url = URL.createObjectURL(blob);
 
     // 创建临时 <a> 标签
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename; // download 属性指定下载文件名
 
@@ -205,83 +217,95 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
    *
    * @param format - 导出格式（'docx' 或 'pdf'）
    */
-  const handleExport = useCallback(async (format: ExportFormat) => {
-    // 安全检查：没有文档 ID 时不执行
-    if (!documentId) return;
+  const handleExport = useCallback(
+    async (format: ExportFormat) => {
+      // 安全检查：没有文档 ID 时不执行
+      if (!documentId) return;
 
-    // 记录格式（用于重试）
-    setLastFormat(format);
+      // 记录格式（用于重试）
+      setLastFormat(format);
 
-    // 关闭下拉菜单
-    setIsDropdownOpen(false);
+      // 关闭下拉菜单
+      setIsDropdownOpen(false);
 
-    // 设置导出中状态
-    setExportStatus('exporting');
-    setErrorMessage('');
+      // 设置导出中状态
+      setExportStatus("exporting");
+      setErrorMessage("");
 
-    // 创建新的 AbortController 实例
-    // AbortController 提供一个 signal 对象，传给 axios 后可以随时中断请求
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+      // 创建新的 AbortController 实例
+      // AbortController 提供一个 signal 对象，传给 axios 后可以随时中断请求
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-    // 设置 30 秒超时定时器
-    // 如果 30 秒内请求未完成，自动中断请求并显示超时错误
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-      setExportStatus('timeout');
-      setErrorMessage('导出超时，请重试');
-    }, EXPORT_TIMEOUT_MS);
+      // 设置 30 秒超时定时器
+      // 如果 30 秒内请求未完成，自动中断请求并显示超时错误
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        setExportStatus("timeout");
+        setErrorMessage("导出超时，请重试");
+      }, EXPORT_TIMEOUT_MS);
 
-    try {
-      // 发送导出请求
-      // responseType: 'blob' 告诉 axios 将响应数据解析为二进制 Blob 对象
-      // signal: controller.signal 允许我们在超时时中断请求
-      const response = await apiClient.post(`/export/${documentId}`, { format }, {
-        responseType: 'blob',
-        signal: controller.signal,
-        timeout: EXPORT_TIMEOUT_MS, // axios 自身的超时设置（双重保障）
-      });
+      try {
+        // 发送导出请求
+        // responseType: 'blob' 告诉 axios 将响应数据解析为二进制 Blob 对象
+        // signal: controller.signal 允许我们在超时时中断请求
+        const response = await apiClient.post(
+          `/export/${documentId}`,
+          { format },
+          {
+            responseType: "blob",
+            signal: controller.signal,
+            timeout: EXPORT_TIMEOUT_MS, // axios 自身的超时设置（双重保障）
+          },
+        );
 
-      // 清除超时定时器（请求已成功完成，不需要再触发超时）
-      clearTimeout(timeoutId);
+        // 清除超时定时器（请求已成功完成，不需要再触发超时）
+        clearTimeout(timeoutId);
 
-      // 从响应头提取文件名
-      const contentDisposition = response.headers['content-disposition'] || null;
-      const filename = extractFilename(contentDisposition, format);
+        // 从响应头提取文件名
+        const contentDisposition =
+          response.headers["content-disposition"] || null;
+        const filename = extractFilename(contentDisposition, format);
 
-      // 触发浏览器下载
-      triggerDownload(response.data as Blob, filename);
+        // 触发浏览器下载
+        triggerDownload(response.data as Blob, filename);
 
-      // 更新状态为成功
-      setExportStatus('success');
+        // 更新状态为成功
+        setExportStatus("success");
 
-      // 3 秒后恢复为空闲状态
-      setTimeout(() => {
-        setExportStatus('idle');
-      }, 3000);
+        // 3 秒后恢复为空闲状态
+        setTimeout(() => {
+          setExportStatus("idle");
+        }, 3000);
+      } catch (error: unknown) {
+        // 清除超时定时器
+        clearTimeout(timeoutId);
 
-    } catch (error: unknown) {
-      // 清除超时定时器
-      clearTimeout(timeoutId);
+        // 如果是被 AbortController 中断的请求（超时导致），
+        // 状态已经在 setTimeout 回调中设置了，这里不需要重复处理
+        if (error instanceof Error && error.name === "AbortError") {
+          // 超时中断 - 状态已在 timeout 回调中设置
+          return;
+        }
 
-      // 如果是被 AbortController 中断的请求（超时导致），
-      // 状态已经在 setTimeout 回调中设置了，这里不需要重复处理
-      if (error instanceof Error && error.name === 'AbortError') {
-        // 超时中断 - 状态已在 timeout 回调中设置
-        return;
+        // 检查 axios 的 CanceledError（axios 对 abort 的封装）
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          (error as { code: string }).code === "ERR_CANCELED"
+        ) {
+          // 请求被取消（超时） - 状态已设置
+          return;
+        }
+
+        // 其他错误：网络错误、服务器错误等
+        setExportStatus("error");
+        setErrorMessage("导出失败，请重试");
       }
-
-      // 检查 axios 的 CanceledError（axios 对 abort 的封装）
-      if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'ERR_CANCELED') {
-        // 请求被取消（超时） - 状态已设置
-        return;
-      }
-
-      // 其他错误：网络错误、服务器错误等
-      setExportStatus('error');
-      setErrorMessage('导出失败，请重试');
-    }
-  }, [documentId]);
+    },
+    [documentId],
+  );
 
   /**
    * 重试导出
@@ -295,8 +319,8 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
    * 关闭错误提示，恢复空闲状态
    */
   const handleDismissError = useCallback(() => {
-    setExportStatus('idle');
-    setErrorMessage('');
+    setExportStatus("idle");
+    setErrorMessage("");
   }, []);
 
   // ==================== 渲染 ====================
@@ -312,15 +336,16 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
       <button
         onClick={() => !isExporting && setIsDropdownOpen(!isDropdownOpen)}
         disabled={isDisabled || isExporting}
-        title={isDisabled ? '文档无内容可导出' : '导出文档'}
+        title={isDisabled ? "文档无内容可导出" : "导出文档"}
         className={`
           flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium
           transition-all duration-200 ease-in-out
-          ${isDisabled
-            ? 'bg-gray-100 text-gray-300 cursor-not-allowed dark:bg-[#2D2E42] dark:text-[#6B7280]'
-            : isExporting
-              ? 'bg-[var(--color-accent-light)] text-[var(--color-text-primary)] cursor-wait'
-              : 'bg-[var(--color-accent-light)] text-[var(--color-text-primary)] hover:bg-[var(--color-accent)] hover:text-gray-800 cursor-pointer'
+          ${
+            isDisabled
+              ? "bg-gray-100 text-gray-300 cursor-not-allowed dark:bg-[#2D2E42] dark:text-[#6B7280]"
+              : isExporting
+                ? "bg-[var(--color-accent-light)] text-[var(--color-text-primary)] cursor-wait"
+                : "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] cursor-pointer"
           }
         `}
       >
@@ -370,16 +395,18 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
 
       {/* ===== 下拉菜单 ===== */}
       {isDropdownOpen && !isDisabled && (
-        <div className="
+        <div
+          className="
           absolute right-0 top-full mt-1 z-50
           w-40 rounded-md py-1
           bg-[var(--color-bg)] border border-[var(--color-border)]
           shadow-md
           transition-all duration-200 ease-in-out
-        ">
+        "
+        >
           {/* Word 格式选项 */}
           <button
-            onClick={() => handleExport('docx')}
+            onClick={() => handleExport("docx")}
             className="
               w-full text-left px-3 py-2 text-sm
               text-[var(--color-text-primary)]
@@ -389,7 +416,11 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
           >
             <div className="flex items-center gap-2">
               {/* Word 图标 */}
-              <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+              <svg
+                className="w-4 h-4 text-blue-500"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
                 <path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6zm7 1.5L18.5 9H13V3.5zM7 13l1.5 5 1.5-3.5L11.5 18 13 13h1.5l-2.5 7h-1l-1.5-4-1.5 4h-1L5 13h2z" />
               </svg>
               <span>导出为 Word</span>
@@ -398,7 +429,7 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
 
           {/* PDF 格式选项 */}
           <button
-            onClick={() => handleExport('pdf')}
+            onClick={() => handleExport("pdf")}
             className="
               w-full text-left px-3 py-2 text-sm
               text-[var(--color-text-primary)]
@@ -408,7 +439,11 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
           >
             <div className="flex items-center gap-2">
               {/* PDF 图标 */}
-              <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+              <svg
+                className="w-4 h-4 text-red-500"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
                 <path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6zm7 1.5L18.5 9H13V3.5zM8 13c.6 0 1.1.2 1.4.5.3.3.5.8.5 1.3 0 .5-.2 1-.5 1.3-.3.3-.8.5-1.4.5H7v2H5.5v-5.6H8zm4.5 0c.8 0 1.4.2 1.9.7.5.5.7 1.1.7 1.9s-.2 1.4-.7 1.9c-.5.5-1.1.7-1.9.7H11v-5.2h1.5zm4 0v1.2h-1.3v1.2h1.1v1.1h-1.1V19h-1.5v-6h2.8zM7 14.2v1.4h.8c.2 0 .4-.1.5-.2.1-.1.2-.3.2-.5s-.1-.4-.2-.5c-.1-.1-.3-.2-.5-.2H7zm4.5.1v3h.3c.4 0 .7-.1.9-.4.2-.3.3-.6.3-1.1 0-.5-.1-.8-.3-1.1-.2-.3-.5-.4-.9-.4h-.3z" />
               </svg>
               <span>导出为 PDF</span>
@@ -418,15 +453,17 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
       )}
 
       {/* ===== 错误/超时提示 ===== */}
-      {(exportStatus === 'error' || exportStatus === 'timeout') && (
-        <div className="
-          absolute right-0 top-full mt-1 z-50
-          w-56 rounded-md p-3
-          bg-[var(--color-bg)] border border-[var(--color-error)]
-          shadow-md
-        ">
+      {(exportStatus === "error" || exportStatus === "timeout") && (
+        <div
+          className="
+            absolute right-0 top-full mt-1 z-50
+            w-64 rounded-lg p-4
+            bg-[var(--color-bg)] border border-[var(--color-border)]
+            shadow-md space-y-4
+          "
+        >
           {/* 错误信息 */}
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-3 text-left">
             {/* 错误图标 */}
             <svg
               className="w-4 h-4 mt-0.5 text-[var(--color-error)] shrink-0"
@@ -441,19 +478,19 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <p className="text-xs text-[var(--color-text-primary)]">
+            <p className="flex-1 text-sm leading-5 text-[var(--color-text-primary)]">
               {errorMessage}
             </p>
           </div>
 
           {/* 操作按钮 */}
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2">
             {/* 重试按钮 */}
             <button
               onClick={handleRetry}
               className="
-                flex-1 rounded-md px-2 py-1 text-xs font-medium
-                bg-[var(--color-accent)] text-gray-800
+                flex-1 rounded-md px-3 py-2 text-sm font-medium
+                bg-[var(--color-accent)] text-white
                 hover:bg-[var(--color-accent-dark)]
                 transition-all duration-100 ease-out
               "
@@ -464,9 +501,9 @@ export function ExportButton({ documentId, isContentEmpty, documentTitle }: Expo
             <button
               onClick={handleDismissError}
               className="
-                flex-1 rounded-md px-2 py-1 text-xs font-medium
+                flex-1 rounded-md px-3 py-2 text-sm font-medium
                 text-[var(--color-text-secondary)]
-                hover:bg-[var(--color-accent-light)]
+                hover:bg-[var(--color-bg-hover)]
                 transition-all duration-100 ease-out
               "
             >

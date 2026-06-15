@@ -12,7 +12,9 @@
  * <CreateDocDialog open={isOpen} onClose={handleClose} onCreate={handleCreate} />
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from "react";
+
+const DIALOG_ANIMATION_MS = 240;
 
 /**
  * CreateDocDialog 组件 Props
@@ -40,9 +42,14 @@ export interface CreateDocDialogProps {
  *
  * @param props - 组件属性
  */
-export function CreateDocDialog({ open, onClose, onCreate }: CreateDocDialogProps) {
-  const [title, setTitle] = useState('');
-  const [error, setError] = useState('');
+export function CreateDocDialog({
+  open,
+  onClose,
+  onCreate,
+}: CreateDocDialogProps) {
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState("");
+  const [isVisible, setIsVisible] = useState(open);
 
   /**
    * useRef 保存输入框引用，用于对话框打开时自动聚焦
@@ -54,11 +61,19 @@ export function CreateDocDialog({ open, onClose, onCreate }: CreateDocDialogProp
    */
   useEffect(() => {
     if (open) {
-      setTitle('');
-      setError('');
+      setIsVisible(true);
+      setTitle("");
+      setError("");
       // setTimeout 确保 DOM 渲染完成后再聚焦
       setTimeout(() => inputRef.current?.focus(), 50);
+      return;
     }
+
+    const timer = window.setTimeout(() => {
+      setIsVisible(false);
+    }, DIALOG_ANIMATION_MS);
+
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   /**
@@ -68,16 +83,16 @@ export function CreateDocDialog({ open, onClose, onCreate }: CreateDocDialogProp
     const trimmed = title.trim();
 
     if (!trimmed) {
-      setError('请输入文档标题');
+      setError("请输入文档标题");
       return;
     }
 
     if (trimmed.length > 50) {
-      setError('标题不能超过 50 个字符');
+      setError("标题不能超过 50 个字符");
       return;
     }
 
-    setError('');
+    setError("");
     onCreate(trimmed);
     onClose();
   }, [title, onCreate, onClose]);
@@ -87,21 +102,25 @@ export function CreateDocDialog({ open, onClose, onCreate }: CreateDocDialogProp
    */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
+      if (e.key === "Enter") {
         e.preventDefault();
         handleSubmit();
-      } else if (e.key === 'Escape') {
+      } else if (e.key === "Escape") {
         onClose();
       }
     },
     [handleSubmit, onClose],
   );
 
+  if (!isVisible) {
+    return null;
+  }
+
   return (
     <div
       className={`
         fixed inset-0 z-50 flex items-center justify-center
-        ${open ? 'pointer-events-auto' : 'pointer-events-none'}
+        ${open ? "pointer-events-auto" : "pointer-events-none"}
       `}
       onClick={onClose}
       role="dialog"
@@ -111,18 +130,22 @@ export function CreateDocDialog({ open, onClose, onCreate }: CreateDocDialogProp
     >
       {/* 遮罩层 */}
       <div
-        className={`absolute inset-0 bg-black/40 ${open ? 'opacity-100' : 'opacity-0'}`}
-        style={{ transition: 'opacity 200ms linear' }}
+        className={`absolute inset-0 bg-black/40 ${open ? "opacity-100" : "opacity-0"}`}
+        style={{
+          transition: `all ${DIALOG_ANIMATION_MS}ms`,
+        }}
       />
 
       {/* 对话框内容区域 */}
       <div
         className={`
           relative w-full max-w-md mx-4 p-6 rounded-xl bg-[var(--color-bg)] shadow-lg
-          origin-center
-          ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
+          origin-center will-change-transform will-change-opacity
+          ${open ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-[0.92] -translate-y-3"}
         `}
-        style={{ transition: 'opacity 200ms linear, transform 200ms linear' }}
+        style={{
+          transition: `all ${DIALOG_ANIMATION_MS}ms`,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -139,7 +162,7 @@ export function CreateDocDialog({ open, onClose, onCreate }: CreateDocDialogProp
           value={title}
           onChange={(e) => {
             setTitle(e.target.value);
-            if (error) setError('');
+            if (error) setError("");
           }}
           onKeyDown={handleKeyDown}
           placeholder="请输入文档标题（1-50 字符）"
@@ -150,7 +173,7 @@ export function CreateDocDialog({ open, onClose, onCreate }: CreateDocDialogProp
             placeholder:text-[var(--color-text-muted)]
             focus:outline-none focus:border-[var(--color-border-focus)]
             transition-colors
-            ${error ? 'border-[var(--color-error)]' : 'border-[var(--color-border)]'}
+            ${error ? "border-[var(--color-error)]" : "border-[var(--color-border)]"}
           `}
         />
 

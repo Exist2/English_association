@@ -20,20 +20,22 @@
  * - 用户删除文档 → 如果是当前文档则清空编辑器
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { RichEditor } from '../components/RichEditor';
-import { HintPanel } from '../components/HintPanel';
-import { HistoryPanel } from '../components/HistoryPanel';
-import { ThemePanel } from '../components/ThemePanel';
-import { ExportButton } from '../components/ExportButton';
-import { SaveStatusIndicator } from '../components/SaveStatusIndicator';
-import { CreateDocDialog } from '../components/CreateDocDialog';
-import { useTheme } from '../hooks/useTheme';
-import { useAutoSave } from '../hooks/useAutoSave';
-import { useAssociation } from '../hooks/useAssociation';
-import { useDocument } from '../hooks/useDocument';
-import { useAuth } from '../hooks/useAuth';
-import { documentApi } from '../services/generated/document';
+import { useState, useCallback, useRef, useEffect } from "react";
+import { RichEditor } from "../components/RichEditor";
+import { HintPanel } from "../components/HintPanel";
+import { HistoryPanel } from "../components/HistoryPanel";
+import { ThemePanel } from "../components/ThemePanel";
+import { ExportButton } from "../components/ExportButton";
+import { SaveStatusIndicator } from "../components/SaveStatusIndicator";
+import { CreateDocDialog } from "../components/CreateDocDialog";
+import { useTheme } from "../hooks/useTheme";
+import { useAutoSave } from "../hooks/useAutoSave";
+import { useAssociation } from "../hooks/useAssociation";
+import { useDocument } from "../hooks/useDocument";
+import { useAuth } from "../hooks/useAuth";
+import { documentApi } from "../services/generated/document";
+
+const PANEL_ANIMATION_MS = 240;
 
 // ==================== 组件实现 ====================
 
@@ -52,31 +54,35 @@ function EditorPage() {
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
 
   /** 当前文档标题 */
-  const [currentDocTitle, setCurrentDocTitle] = useState<string>('');
+  const [currentDocTitle, setCurrentDocTitle] = useState<string>("");
 
   /** 编辑器内容（Tiptap JSON 字符串） */
-  const [editorContent, setEditorContent] = useState<string>('');
+  const [editorContent, setEditorContent] = useState<string>("");
 
   /** 历史面板是否折叠 */
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
 
   /** 主题设置面板是否打开 */
   const [isThemePanelOpen, setIsThemePanelOpen] = useState(false);
+  const [isThemePanelMounted, setIsThemePanelMounted] = useState(false);
 
   /** 新建文档对话框是否打开 */
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   /** 用户最后输入的文本片段（用于触发联想） */
-  const [lastTypedText, setLastTypedText] = useState<string>('');
+  const [lastTypedText, setLastTypedText] = useState<string>("");
 
   /** 标题是否处于编辑模式 */
   const [isTitleEditing, setIsTitleEditing] = useState(false);
 
   /** 标题编辑中的临时值 */
-  const [editingTitle, setEditingTitle] = useState('');
+  const [editingTitle, setEditingTitle] = useState("");
 
   /** 最近一次标题更新（传递给 HistoryPanel 同步列表显示） */
-  const [lastTitleUpdate, setLastTitleUpdate] = useState<{ id: string; title: string } | null>(null);
+  const [lastTitleUpdate, setLastTitleUpdate] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   /** 列表刷新信号（递增触发 HistoryPanel 重新获取列表） */
   const [refreshSignal, setRefreshSignal] = useState(0);
@@ -115,7 +121,12 @@ function EditorPage() {
    * 对 lastTypedText 进行防抖 500ms 后调用联想 API
    * enabled 为 true 表示当前有文档在编辑且有输入文本
    */
-  const { hints, isLoading: isHintLoading, isVisible: isHintVisible, error: hintError } = useAssociation({
+  const {
+    hints,
+    isLoading: isHintLoading,
+    isVisible: isHintVisible,
+    error: hintError,
+  } = useAssociation({
     text: lastTypedText,
     enabled: !!currentDocId && lastTypedText.length > 0,
     hintDuration: theme.hintDuration,
@@ -126,7 +137,11 @@ function EditorPage() {
    * 提供文档加载方法（用于从历史面板选择文档后加载内容）
    * 同时取出 documents 和 isLoading 用于判断空状态（是否需要展示引导页）
    */
-  const { loadDocument, documents: initialDocuments, isLoading: isDocListLoading } = useDocument();
+  const {
+    loadDocument,
+    documents: initialDocuments,
+    isLoading: isDocListLoading,
+  } = useDocument();
 
   /**
    * 是否存在文档的标志
@@ -149,13 +164,15 @@ function EditorPage() {
         setHasDocuments(true);
         // 自动加载第一篇文档（列表按 updatedAt 降序，第一条即最近修改的）
         const firstDoc = initialDocuments[0];
-        loadDocument(firstDoc.id).then((doc) => {
-          setCurrentDocId(firstDoc.id);
-          setCurrentDocTitle(doc.title);
-          setEditorContent(doc.content);
-        }).catch(() => {
-          // 加载失败时不阻塞，用户可以手动从历史面板选择
-        });
+        loadDocument(firstDoc.id)
+          .then((doc) => {
+            setCurrentDocId(firstDoc.id);
+            setCurrentDocTitle(doc.title);
+            setEditorContent(doc.content);
+          })
+          .catch(() => {
+            // 加载失败时不阻塞，用户可以手动从历史面板选择
+          });
       } else {
         setHasDocuments(false);
       }
@@ -198,9 +215,9 @@ function EditorPage() {
         if (paragraph.content && paragraph.content.length > 0) {
           // 拼接段落内所有文本节点
           const text = paragraph.content
-            .filter((node: { type: string }) => node.type === 'text')
-            .map((node: { text: string }) => node.text || '')
-            .join('');
+            .filter((node: { type: string }) => node.type === "text")
+            .map((node: { text: string }) => node.text || "")
+            .join("");
           if (text.trim()) {
             setLastTypedText(text);
             return;
@@ -208,10 +225,10 @@ function EditorPage() {
         }
       }
       // 没有找到文本内容
-      setLastTypedText('');
+      setLastTypedText("");
     } catch {
       // JSON 解析失败时不更新联想文本
-      setLastTypedText('');
+      setLastTypedText("");
     }
   }, []);
 
@@ -221,17 +238,20 @@ function EditorPage() {
    *
    * @param docId - 选中的文档 ID
    */
-  const handleDocumentSelect = useCallback(async (docId: string) => {
-    try {
-      const doc = await loadDocument(docId);
-      setCurrentDocId(docId);
-      setCurrentDocTitle(doc.title);
-      setEditorContent(doc.content);
-      setLastTypedText('');
-    } catch {
-      // loadDocument 内部已处理错误，这里不需要额外操作
-    }
-  }, [loadDocument]);
+  const handleDocumentSelect = useCallback(
+    async (docId: string) => {
+      try {
+        const doc = await loadDocument(docId);
+        setCurrentDocId(docId);
+        setCurrentDocTitle(doc.title);
+        setEditorContent(doc.content);
+        setLastTypedText("");
+      } catch {
+        // loadDocument 内部已处理错误，这里不需要额外操作
+      }
+    },
+    [loadDocument],
+  );
 
   /**
    * 处理删除文档
@@ -239,15 +259,18 @@ function EditorPage() {
    *
    * @param docId - 被删除的文档 ID
    */
-  const handleDocumentDelete = useCallback((docId: string) => {
-    if (docId === currentDocId) {
-      // 当前文档被删除，清空编辑器状态
-      setCurrentDocId(null);
-      setCurrentDocTitle('');
-      setEditorContent('');
-      setLastTypedText('');
-    }
-  }, [currentDocId]);
+  const handleDocumentDelete = useCallback(
+    (docId: string) => {
+      if (docId === currentDocId) {
+        // 当前文档被删除，清空编辑器状态
+        setCurrentDocId(null);
+        setCurrentDocTitle("");
+        setEditorContent("");
+        setLastTypedText("");
+      }
+    },
+    [currentDocId],
+  );
 
   /**
    * 处理新建文档
@@ -258,15 +281,15 @@ function EditorPage() {
   const handleCreateDocument = useCallback(async (title: string) => {
     try {
       // 调用创建文档 API，初始内容为空
-      const response = await documentApi.create({ title, content: '' });
+      const response = await documentApi.create({ title, content: "" });
       const newDocId = response.data.id;
 
       if (newDocId) {
         // 创建成功，设置为当前文档
         setCurrentDocId(newDocId);
         setCurrentDocTitle(title);
-        setEditorContent('');
-        setLastTypedText('');
+        setEditorContent("");
+        setLastTypedText("");
         // 标记已有文档，退出空状态
         setHasDocuments(true);
         // 触发历史列表刷新，让新文档出现在列表中
@@ -274,7 +297,7 @@ function EditorPage() {
       }
     } catch {
       // 创建失败，静默处理（可以后续添加 Toast 提示）
-      console.error('创建文档失败');
+      console.error("创建文档失败");
     }
   }, []);
 
@@ -284,11 +307,15 @@ function EditorPage() {
    *
    * @param config - 部分主题配置对象
    */
-  const handleThemeChange = useCallback((config: Partial<typeof theme>) => {
-    if (config.mode !== undefined) setMode(config.mode);
-    if (config.fontSize !== undefined) setFontSize(config.fontSize);
-    if (config.hintDuration !== undefined) setHintDuration(config.hintDuration);
-  }, [setMode, setFontSize, setHintDuration]);
+  const handleThemeChange = useCallback(
+    (config: Partial<typeof theme>) => {
+      if (config.mode !== undefined) setMode(config.mode);
+      if (config.fontSize !== undefined) setFontSize(config.fontSize);
+      if (config.hintDuration !== undefined)
+        setHintDuration(config.hintDuration);
+    },
+    [setMode, setFontSize, setHintDuration],
+  );
 
   /**
    * 切换历史面板折叠状态
@@ -301,8 +328,22 @@ function EditorPage() {
    * 切换主题设置面板显示/隐藏
    */
   const handleToggleThemePanel = useCallback(() => {
+    setIsThemePanelMounted(true);
     setIsThemePanelOpen((prev) => !prev);
   }, []);
+
+  useEffect(() => {
+    if (isThemePanelOpen) {
+      setIsThemePanelMounted(true);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsThemePanelMounted(false);
+    }, PANEL_ANIMATION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [isThemePanelOpen]);
 
   /**
    * 双击标题进入编辑模式
@@ -340,7 +381,7 @@ function EditorPage() {
       // 保存失败时回退标题
       setCurrentDocTitle(currentDocTitle);
       setLastTitleUpdate(null);
-      console.error('标题保存失败');
+      console.error("标题保存失败");
     }
   }, [editingTitle, currentDocTitle, currentDocId]);
 
@@ -348,16 +389,19 @@ function EditorPage() {
    * 标题输入框按下 Enter 时确认编辑（触发 blur）
    * 按下 Escape 时取消编辑
    */
-  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      // Enter 确认：让 input 失去焦点，触发 handleTitleBlur
-      (e.target as HTMLInputElement).blur();
-    } else if (e.key === 'Escape') {
-      // Escape 取消：恢复原标题并退出编辑模式
-      setEditingTitle(currentDocTitle);
-      setIsTitleEditing(false);
-    }
-  }, [currentDocTitle]);
+  const handleTitleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        // Enter 确认：让 input 失去焦点，触发 handleTitleBlur
+        (e.target as HTMLInputElement).blur();
+      } else if (e.key === "Escape") {
+        // Escape 取消：恢复原标题并退出编辑模式
+        setEditingTitle(currentDocTitle);
+        setIsTitleEditing(false);
+      }
+    },
+    [currentDocTitle],
+  );
 
   // ==================== 渲染 ====================
 
@@ -393,7 +437,12 @@ function EditorPage() {
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             <span>新建文档</span>
           </button>
@@ -423,10 +472,23 @@ function EditorPage() {
             fill="none"
             viewBox="0 0 24 24"
           >
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
           </svg>
-          <span className="text-sm text-[var(--color-text-secondary)]">加载中...</span>
+          <span className="text-sm text-[var(--color-text-secondary)]">
+            加载中...
+          </span>
         </div>
       </div>
     );
@@ -461,35 +523,44 @@ function EditorPage() {
        */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--color-bg-content)]">
         {/* ----- 顶部工具栏 ----- */}
-        <header className="
+        <header
+          className="
           flex items-center justify-between
           h-12 px-4 shrink-0
           border-b border-[var(--color-border)]
           bg-[var(--color-bg-content)]
-        ">
-          {/* 左侧：汉堡菜单 + 保存状态 */}
-          <div className="flex items-center gap-3">
-            {/* 汉堡菜单按钮（展开/折叠历史面板） */}
-            <button
-              onClick={handleToggleHistory}
-              className="
-                p-1.5 rounded-md
-                hover:bg-[var(--color-accent-light)]
-                transition-colors duration-100
-              "
-              aria-label={isHistoryCollapsed ? '展开历史记录' : '折叠历史记录'}
-              title={isHistoryCollapsed ? '展开历史记录' : '折叠历史记录'}
-            >
-              {/* 汉堡菜单图标（三条横线） */}
-              <svg
-                className="w-5 h-5 text-[var(--color-text-secondary)]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+        "
+        >
+          {/* 左侧：展开按钮 + 保存状态 */}
+          <div className="flex items-center gap-2.5">
+            {isHistoryCollapsed && (
+              <button
+                onClick={handleToggleHistory}
+                className="
+                  flex shrink-0 items-center justify-center
+                  p-1 rounded-md
+                  text-[var(--color-text-secondary)]
+                  hover:bg-[var(--color-bg-hover)]
+                  transition-colors duration-100
+                "
+                aria-label="展开历史记录"
+                title="展开历史记录"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            )}
 
             {/* 保存状态指示器 */}
             <SaveStatusIndicator
@@ -521,7 +592,7 @@ function EditorPage() {
             ) : (
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-                  {currentDocTitle || '未选择文档'}
+                  {currentDocTitle || "未选择文档"}
                 </span>
                 {/* 编辑图标：仅在有文档时显示，点击进入标题编辑模式 */}
                 {currentDocId && (
@@ -537,8 +608,18 @@ function EditorPage() {
                     title="编辑标题"
                   >
                     {/* 铅笔编辑图标 */}
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                      />
                     </svg>
                   </button>
                 )}
@@ -553,7 +634,7 @@ function EditorPage() {
               onClick={() => setIsCreateDialogOpen(true)}
               className="
                 p-1.5 rounded-md
-                hover:bg-[var(--color-accent-light)]
+                hover:bg-[var(--color-bg-hover)]
                 transition-colors duration-100
               "
               aria-label="新建文档"
@@ -566,7 +647,12 @@ function EditorPage() {
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
             </button>
 
@@ -576,7 +662,7 @@ function EditorPage() {
                 onClick={handleToggleThemePanel}
                 className="
                   p-1.5 rounded-md
-                  hover:bg-[var(--color-accent-light)]
+                  hover:bg-[var(--color-bg-hover)]
                   transition-colors duration-100
                 "
                 aria-label="主题设置"
@@ -595,28 +681,38 @@ function EditorPage() {
                     strokeWidth={2}
                     d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
                   />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
                 </svg>
               </button>
 
               {/* 主题设置面板（下拉浮层，始终渲染，通过 opacity + scale 实现 0.2s 过渡动画） */}
-              <div
-                className={`
-                  absolute right-0 top-full mt-2 z-50
-                  w-72 origin-top-right
-                  ${isThemePanelOpen
-                    ? 'opacity-100 scale-100 pointer-events-auto'
-                    : 'opacity-0 scale-95 pointer-events-none'
-                  }
-                `}
-                style={{ transition: 'opacity 200ms linear, transform 200ms linear' }}
-              >
-                <ThemePanel
-                  currentTheme={theme}
-                  onThemeChange={handleThemeChange}
-                  onLogout={logout}
-                />
-              </div>
+              {isThemePanelMounted && (
+                <div
+                  className={`
+                    absolute right-0 top-full mt-2 z-50
+                    w-72 origin-top-right will-change-transform will-change-opacity
+                    ${
+                      isThemePanelOpen
+                        ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+                        : "opacity-0 scale-[0.92] -translate-y-2 pointer-events-none"
+                    }
+                  `}
+                  style={{
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <ThemePanel
+                    currentTheme={theme}
+                    onThemeChange={handleThemeChange}
+                    onLogout={logout}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 导出按钮 */}
@@ -669,7 +765,7 @@ function EditorPage() {
 
       {/* ===== 主题面板外部点击关闭遮罩（仅在面板打开时） ===== */}
       {/* z-45 介于侧边栏(z-40)和主题面板(z-50)之间，点击任意位置关闭面板 */}
-      {isThemePanelOpen && (
+      {isThemePanelMounted && (
         <div
           className="fixed inset-0 z-[45]"
           onClick={() => setIsThemePanelOpen(false)}
